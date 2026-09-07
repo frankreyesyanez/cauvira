@@ -4,9 +4,9 @@
 
 **Goal:** Build the production-shaped Cauvira foundation, authenticated backoffice, dynamic catalog, and searchable public storefront as the first independently deployable release.
 
-**Architecture:** Use one Next.js application with route groups for storefront and backoffice, server-only domain services, PostgreSQL persistence through Drizzle, and Better Auth for identity. Keep catalog, identity, and presentation boundaries separate so later commerce, quotations, purchasing, and fulfillment modules can consume stable catalog interfaces without importing UI code.
+**Architecture:** Use one Next.js application deployed on Vercel, with route groups for storefront and backoffice, server-only domain services, Supabase-managed PostgreSQL through Drizzle, and Better Auth for identity. Use separate pooled runtime, direct migration, and isolated test database URLs. Keep catalog, identity, and presentation boundaries separate so later commerce, quotations, purchasing, and fulfillment modules can consume stable catalog interfaces without importing UI code.
 
-**Tech Stack:** Next.js 16.3.4, React 19.2.8, TypeScript, PostgreSQL 17, Drizzle ORM 0.45.2, Better Auth 1.7.3, Zod 4.5.4, Tailwind CSS 4.3.3, Vitest 5.0.0, Testing Library, and Playwright 1.63.0.
+**Tech Stack:** Next.js 16.3.4 on Vercel, React 19.2.8, TypeScript, Supabase-managed PostgreSQL, Drizzle ORM 0.45.2, Better Auth 1.7.3, Zod 4.5.4, Tailwind CSS 4.3.3, Vitest 5.0.0, Testing Library, and Playwright 1.63.0.
 
 ## Global Constraints
 
@@ -19,6 +19,8 @@
 - The backoffice uses the same brand with lower chromatic intensity and denser information.
 - Critical statuses never rely on color alone and all text combinations meet WCAG AA.
 - Server code validates every mutation and enforces authorization independently of the UI.
+- Docker is not required for development, testing, or production hosting.
+- Runtime, migration, test, and production database credentials remain separate.
 - This phase does not implement checkout, payment capture, quotations, or supplier purchase orders.
 
 ## Delivery roadmap
@@ -57,7 +59,7 @@ src/
     ui/button.tsx
     ui/field.tsx
   db/
-    index.ts                           PostgreSQL client and Drizzle instance
+    index.ts                           Supabase PostgreSQL client and Drizzle instance
     schema/auth.ts                     Better Auth tables
     schema/catalog.ts                  category and product tables
     seed.ts                            deterministic local catalog
@@ -81,7 +83,6 @@ e2e/
   admin-catalog.spec.ts
   storefront-catalog.spec.ts
 drizzle.config.ts
-docker-compose.yml
 playwright.config.ts
 vitest.config.ts
 ```
@@ -219,10 +220,9 @@ git commit -m "chore: bootstrap Cauvira web application"
 
 ---
 
-### Task 2: Add validated environment and PostgreSQL infrastructure
+### Task 2: Add validated Supabase PostgreSQL infrastructure
 
 **Files:**
-- Create: `docker-compose.yml`
 - Create: `src/lib/env.ts`
 - Create: `src/db/index.ts`
 - Create: `drizzle.config.ts`
@@ -230,8 +230,11 @@ git commit -m "chore: bootstrap Cauvira web application"
 - Modify: `.env.example`
 
 **Interfaces:**
-- Produces: `env.DATABASE_URL: string`, `env.BETTER_AUTH_SECRET: string`, and `env.BETTER_AUTH_URL: string`.
-- Produces: `db`, the only application-wide Drizzle database instance.
+- Produces: `env.DATABASE_URL: string`, `env.MIGRATION_DATABASE_URL: string`, `env.TEST_DATABASE_URL: string`, `env.BETTER_AUTH_SECRET: string`, and `env.BETTER_AUTH_URL: string`.
+- Produces: `createDatabase(url)` for isolated tests and `db`, the only runtime Drizzle database instance.
+- `DATABASE_URL` uses the Supabase transaction pooler for Vercel runtime traffic.
+- `MIGRATION_DATABASE_URL` uses a direct or session-pooler connection for schema changes.
+- `TEST_DATABASE_URL` points to a separate Supabase test project or branch and never production.
 
 - [ ] **Step 1: Write environment validation tests**
 
@@ -245,6 +248,8 @@ describe("parseEnv", () => {
     expect(() =>
       parseEnv({
         DATABASE_URL: "not-a-url",
+        MIGRATION_DATABASE_URL: "postgresql://postgres:secret@db.project.supabase.co:5432/postgres",
+        TEST_DATABASE_URL: "postgresql://postgres:secret@test.pooler.supabase.com:6543/postgres",
         BETTER_AUTH_SECRET: "x".repeat(32),
         BETTER_AUTH_URL: "http://localhost:3000",
       }),
@@ -254,7 +259,9 @@ describe("parseEnv", () => {
   it("accepts the local development environment", () => {
     expect(
       parseEnv({
-        DATABASE_URL: "postgres://cauvira:cauvira@localhost:5432/cauvira",
+        DATABASE_URL: "postgresql://postgres.project:secret@runtime.pooler.supabase.com:6543/postgres",
+        MIGRATION_DATABASE_URL: "postgresql://postgres:secret@db.project.supabase.co:5432/postgres",
+        TEST_DATABASE_URL: "postgresql://postgres:secret@test.pooler.supabase.com:6543/postgres",
         BETTER_AUTH_SECRET: "x".repeat(32),
         BETTER_AUTH_URL: "http://localhost:3000",
       }).BETTER_AUTH_URL,
@@ -273,8 +280,21 @@ Expected: FAIL because `parseEnv` does not exist.
 // src/lib/env.ts
 import { z } from "zod";
 
+const postgresProtocols = new Set(["postgres:", "postgresql:"]);
+const postgresUrl = z.string().superRefine((value, context) => {
+  try {
+    if (!postgresProtocols.has(new URL(value).protocol)) {
+      context.addIssue({ code: "custom", message: "must use PostgreSQL" });
+    }
+  } catch {
+    context.addIssue({ code: "custom", message: "must be a valid URL" });
+  }
+});
+
 const envSchema = z.object({
-  DATABASE_URL: z.url().refine((value) => value.startsWith("postgres"), "DATABASE_URL must use PostgreSQL"),
+  DATABASE_URL: postgresUrl,
+  MIGRATION_DATABASE_URL: postgresUrl,
+  TEST_DATABASE_URL: postgresUrl,
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
 });
@@ -288,24 +308,7 @@ Run: `npm test -- tests/unit/env.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 3: Create local PostgreSQL and Drizzle configuration**
-
-```yaml
-# docker-compose.yml
-services:
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: cauvira
-      POSTGRES_USER: cauvira
-      POSTGRES_PASSWORD: cauvira
-    ports:
-      - "5432:5432"
-    volumes:
-      - cauvira_postgres:/var/lib/postgresql/data
-volumes:
-  cauvira_postgres:
-```
+- [ ] **Step 3: Configure Supabase runtime and migration connections**
 
 ```ts
 // drizzle.config.ts
@@ -315,7 +318,7 @@ export default defineConfig({
   dialect: "postgresql",
   schema: "./src/db/schema/*.ts",
   out: "./drizzle",
-  dbCredentials: { url: process.env.DATABASE_URL! },
+  dbCredentials: { url: process.env.MIGRATION_DATABASE_URL! },
 });
 ```
 
@@ -325,15 +328,21 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { env } from "@/lib/env";
 
-const client = postgres(env.DATABASE_URL, { max: 10 });
-export const db = drizzle(client);
+export const createDatabase = (url: string) => {
+  const client = postgres(url, { max: 1, prepare: false });
+  return drizzle(client);
+};
+
+export const db = createDatabase(env.DATABASE_URL);
 ```
 
-- [ ] **Step 4: Document local values**
+- [ ] **Step 4: Document managed connection values**
 
 ```dotenv
 # .env.example
-DATABASE_URL=postgres://cauvira:cauvira@localhost:5432/cauvira
+DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@REGION.pooler.supabase.com:6543/postgres
+MIGRATION_DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres
+TEST_DATABASE_URL=postgresql://postgres.TEST_PROJECT_REF:PASSWORD@REGION.pooler.supabase.com:6543/postgres
 BETTER_AUTH_SECRET=replace-with-at-least-32-random-characters
 BETTER_AUTH_URL=http://localhost:3000
 ```
@@ -342,17 +351,16 @@ Run:
 
 ```powershell
 Copy-Item .env.example .env.local
-docker compose up -d
 npm run typecheck
 ```
 
-Expected: PostgreSQL reports healthy startup and TypeScript passes.
+Expected: TypeScript passes without Docker. Database commands run only after replacing example values with credentials for separate Supabase development and test projects.
 
 - [ ] **Step 5: Commit infrastructure**
 
 ```powershell
-git add docker-compose.yml drizzle.config.ts src/lib/env.ts src/db/index.ts tests/unit/env.test.ts .env.example package.json package-lock.json
-git commit -m "feat: add validated PostgreSQL infrastructure"
+git add drizzle.config.ts src/lib/env.ts src/db/index.ts tests/unit/env.test.ts .env.example package.json package-lock.json
+git commit -m "feat: add validated Supabase PostgreSQL infrastructure"
 ```
 
 ---
@@ -667,7 +675,7 @@ Expected: PASS.
 
 - [ ] **Step 4: Implement `DrizzleCatalogRepository` and integration tests**
 
-Implement `DrizzleCatalogRepository` in `catalog.repository.ts` using a `db.transaction` for category plus attribute inserts and product plus attribute-value inserts. The integration test must insert a category with `daily_output`, create a product with `daily_output: 500`, query it by slug, and assert the returned value and unit.
+Implement `DrizzleCatalogRepository` in `catalog.repository.ts` using a `db.transaction` for category plus attribute inserts and product plus attribute-value inserts. Create the integration-test database instance with `createDatabase(env.TEST_DATABASE_URL)`, never the runtime `db`. The integration test must insert a category with `daily_output`, create a product with `daily_output: 500`, query it by slug, and assert the returned value and unit.
 
 ```ts
 expect(product?.attributes).toContainEqual({
@@ -679,7 +687,7 @@ expect(product?.attributes).toContainEqual({
 
 Run: `npm test -- tests/integration/catalog.repository.test.ts`
 
-Expected: PASS against local PostgreSQL.
+Expected: PASS against the isolated Supabase test database from `TEST_DATABASE_URL`; production credentials are never loaded by integration tests.
 
 - [ ] **Step 5: Run the complete catalog test slice and commit**
 
@@ -1113,21 +1121,10 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_DB: cauvira
-          POSTGRES_USER: cauvira
-          POSTGRES_PASSWORD: cauvira
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U cauvira"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     env:
-      DATABASE_URL: postgres://cauvira:cauvira@localhost:5432/cauvira
+      DATABASE_URL: ${{ secrets.SUPABASE_TEST_RUNTIME_DATABASE_URL }}
+      MIGRATION_DATABASE_URL: ${{ secrets.SUPABASE_TEST_MIGRATION_DATABASE_URL }}
+      TEST_DATABASE_URL: ${{ secrets.SUPABASE_TEST_RUNTIME_DATABASE_URL }}
       BETTER_AUTH_SECRET: ci-secret-with-at-least-thirty-two-characters
       BETTER_AUTH_URL: http://localhost:3000
     steps:

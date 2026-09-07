@@ -226,19 +226,19 @@ The backoffice shares the brand but uses less chromatic intensity and prioritize
 
 The implementation will use a modular full-stack web architecture with:
 
-- one responsive web application for storefront, portal, and backoffice;
+- one responsive Next.js application for storefront, portal, and backoffice, deployed on Vercel;
 - server-side authorization and validation;
-- PostgreSQL as the transactional database;
-- object storage for media and documents;
+- Supabase-managed PostgreSQL as the transactional database for development, testing, and production;
+- Supabase Storage for media and documents;
 - a payment adapter for Mercado Pago;
-- transactional email;
-- background jobs for document generation, notifications, retries, and supplier integrations;
+- Resend for transactional email;
+- Inngest for document generation, notifications, retries, and supplier integrations;
 - auditable state transitions;
 - provider adapters that isolate external integrations.
 
 Recommended module boundaries are identity and access, catalog, content, customers, quotes, orders, payments, purchasing, suppliers, fulfillment, files, notifications, and audit.
 
-The exact framework and vendors will be selected in the implementation plan. The design does not depend on a single hosting provider.
+Docker is not required for local development or production hosting. Runtime, migration, and test database connections use separate credentials so automated verification cannot write to production data.
 
 ## 11. Reliability and error handling
 
@@ -334,4 +334,5 @@ The following require business credentials or formal validation during implement
 - email sending domain;
 - initial supplier contacts, terms, catalogs, and integration capabilities;
 - parcel carrier or aggregator choice;
-- hosting and domain purchase.
+- Vercel, Supabase, Resend, and Inngest accounts and production credentials;
+- domain purchase and DNS configuration.
