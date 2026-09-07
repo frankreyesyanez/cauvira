@@ -1,2 +1,21 @@
 .superpowers/
 .worktrees/
+
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# testing
+/coverage
+/test-results/
+/playwright-report/
+
+# typescript
+*.tsbuildinfo
+
+# env (keep .env.example trackable)
+.env*.local
+.env.local
