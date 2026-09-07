@@ -14,19 +14,19 @@ const validEnv = {
 
 describe("parseEnv", () => {
   it("requires DATABASE_URL", () => {
-    const input = { ...validEnv };
+    const input: Partial<typeof validEnv> = { ...validEnv };
     delete input.DATABASE_URL;
     expect(() => parseEnv(input)).toThrow(/DATABASE_URL/);
   });
 
   it("requires MIGRATION_DATABASE_URL", () => {
-    const input = { ...validEnv };
+    const input: Partial<typeof validEnv> = { ...validEnv };
     delete input.MIGRATION_DATABASE_URL;
     expect(() => parseEnv(input)).toThrow(/MIGRATION_DATABASE_URL/);
   });
 
   it("requires TEST_DATABASE_URL", () => {
-    const input = { ...validEnv };
+    const input: Partial<typeof validEnv> = { ...validEnv };
     delete input.TEST_DATABASE_URL;
     expect(() => parseEnv(input)).toThrow(/TEST_DATABASE_URL/);
   });

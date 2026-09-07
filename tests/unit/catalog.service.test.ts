@@ -1,0 +1,106 @@
+import { describe, expect, it, vi } from "vitest";
+import { createCatalogService } from "@/features/catalog/catalog.service";
+import type { CatalogRepository } from "@/features/catalog/catalog.repository";
+
+const categoryId = "3d03a1c7-7ca0-44e0-8fcb-1ec03f5d48d0";
+
+const product = {
+  title: "Máquina de hielo 500 kg",
+  slug: "maquina-hielo-500-kg",
+  categoryId,
+  purchaseMode: "quotation",
+  priceMinor: null,
+  summary: "Producción industrial para comercios.",
+  description: "",
+  published: false,
+};
+
+const createRepository = (overrides: Partial<CatalogRepository> = {}) => ({
+  createCategory: vi.fn(),
+  getCategoryWithAttributes: vi.fn().mockResolvedValue({
+    id: categoryId,
+    attributes: [
+      { id: "a1", key: "daily_output", required: true, type: "number" },
+    ],
+  }),
+  createProduct: vi.fn().mockResolvedValue({
+    id: "f6016d3e-c6a1-4db6-98e1-42f026bc0ca0",
+    slug: product.slug,
+  }),
+  listPublishedProducts: vi.fn(),
+  getPublishedProductBySlug: vi.fn(),
+  ...overrides,
+}) as unknown as CatalogRepository;
+
+describe("createCatalogService", () => {
+  it("rejects a product missing a required category attribute", async () => {
+    const service = createCatalogService(createRepository());
+
+    await expect(service.createProduct({ product, attributes: {} })).rejects.toThrow(
+      /daily_output/,
+    );
+  });
+
+  it("rejects an attribute outside the selected category", async () => {
+    const service = createCatalogService(createRepository());
+
+    await expect(
+      service.createProduct({
+        product,
+        attributes: { daily_output: 500, voltage: 220 },
+      }),
+    ).rejects.toThrow(/voltage/);
+  });
+
+  it("rejects products for a missing category", async () => {
+    const repository = createRepository({
+      getCategoryWithAttributes: vi.fn().mockResolvedValue(null),
+    });
+    const service = createCatalogService(repository);
+
+    await expect(
+      service.createProduct({ product, attributes: { daily_output: 500 } }),
+    ).rejects.toThrow(/Category not found/);
+  });
+
+  it("validates and creates a product with category attributes", async () => {
+    const repository = createRepository();
+    const service = createCatalogService(repository);
+
+    await service.createProduct({
+      product: { ...product, title: "  Máquina de hielo 500 kg  " },
+      attributes: { daily_output: 500 },
+    });
+
+    expect(repository.createProduct).toHaveBeenCalledWith({
+      product: { ...product, title: "Máquina de hielo 500 kg" },
+      attributes: { daily_output: 500 },
+    });
+  });
+
+  it("validates category input before persistence", async () => {
+    const repository = createRepository();
+    const service = createCatalogService(repository);
+
+    await expect(
+      service.createCategory({
+        name: "A",
+        slug: "invalid slug",
+        attributes: [],
+      }),
+    ).rejects.toThrow();
+    expect(repository.createCategory).not.toHaveBeenCalled();
+  });
+
+  it("delegates published catalog queries", async () => {
+    const repository = createRepository();
+    const service = createCatalogService(repository);
+    const filters = { query: "hielo", categorySlug: "maquinaria" };
+
+    await service.listPublishedProducts(filters);
+    await service.getPublishedProductBySlug(product.slug);
+
+    expect(repository.listPublishedProducts).toHaveBeenCalledWith(filters);
+    expect(repository.getPublishedProductBySlug).toHaveBeenCalledWith(product.slug);
+  });
+});
