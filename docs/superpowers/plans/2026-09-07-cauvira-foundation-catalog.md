@@ -110,7 +110,7 @@ Run:
 ```powershell
 npx create-next-app@16.3.4 .cauvira-bootstrap --typescript --eslint --tailwind --app --src-dir --import-alias "@/*" --use-npm
 Get-ChildItem -Path .cauvira-bootstrap -Force |
-  Where-Object { $_.Name -ne ".git" } |
+  Where-Object { $_.Name -notin @(".git", ".gitignore") } |
   Copy-Item -Destination . -Recurse -Force
 Remove-Item .cauvira-bootstrap -Recurse -Force
 if (-not (Select-String -Path .gitignore -Pattern '^\.superpowers/$' -Quiet)) {
