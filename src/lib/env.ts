@@ -1,7 +1,27 @@
 import { z } from "zod";
 
+const postgresProtocols = new Set(["postgres:", "postgresql:"]);
+
 const envSchema = z.object({
-  DATABASE_URL: z.url().refine((value) => value.startsWith("postgres"), "DATABASE_URL must use PostgreSQL"),
+  DATABASE_URL: z.string().superRefine((value, ctx) => {
+    let parsed: URL;
+    try {
+      parsed = new URL(value);
+    } catch {
+      ctx.addIssue({
+        code: "custom",
+        message: "DATABASE_URL must be a valid URL",
+      });
+      return;
+    }
+
+    if (!postgresProtocols.has(parsed.protocol)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "DATABASE_URL must use PostgreSQL",
+      });
+    }
+  }),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
 });
