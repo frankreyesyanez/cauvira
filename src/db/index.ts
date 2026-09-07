@@ -2,5 +2,9 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { env } from "@/lib/env";
 
-const client = postgres(env.DATABASE_URL, { max: 10 });
-export const db = drizzle(client);
+export const createDatabase = (url: string) => {
+  const client = postgres(url, { max: 1, prepare: false });
+  return drizzle(client);
+};
+
+export const db = createDatabase(env.DATABASE_URL);

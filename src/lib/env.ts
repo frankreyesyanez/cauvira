@@ -2,26 +2,30 @@ import { z } from "zod";
 
 const postgresProtocols = new Set(["postgres:", "postgresql:"]);
 
-const envSchema = z.object({
-  DATABASE_URL: z.string().superRefine((value, ctx) => {
-    let parsed: URL;
-    try {
-      parsed = new URL(value);
-    } catch {
-      ctx.addIssue({
-        code: "custom",
-        message: "DATABASE_URL must be a valid URL",
-      });
-      return;
-    }
+const postgresUrl = z.string().superRefine((value, ctx) => {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    ctx.addIssue({
+      code: "custom",
+      message: "must be a valid URL",
+    });
+    return;
+  }
 
-    if (!postgresProtocols.has(parsed.protocol)) {
-      ctx.addIssue({
-        code: "custom",
-        message: "DATABASE_URL must use PostgreSQL",
-      });
-    }
-  }),
+  if (!postgresProtocols.has(parsed.protocol)) {
+    ctx.addIssue({
+      code: "custom",
+      message: "must use PostgreSQL",
+    });
+  }
+});
+
+const envSchema = z.object({
+  DATABASE_URL: postgresUrl,
+  MIGRATION_DATABASE_URL: postgresUrl,
+  TEST_DATABASE_URL: postgresUrl,
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
 });
