@@ -20,7 +20,14 @@ const createRepository = (overrides: Partial<CatalogRepository> = {}) => ({
   getCategoryWithAttributes: vi.fn().mockResolvedValue({
     id: categoryId,
     attributes: [
-      { id: "a1", key: "daily_output", required: true, type: "number" },
+      {
+        id: "a1",
+        key: "daily_output",
+        required: true,
+        type: "number",
+        options: [],
+        unit: null,
+      },
     ],
   }),
   createProduct: vi.fn().mockResolvedValue({
@@ -102,5 +109,157 @@ describe("createCatalogService", () => {
 
     expect(repository.listPublishedProducts).toHaveBeenCalledWith(filters);
     expect(repository.getPublishedProductBySlug).toHaveBeenCalledWith(product.slug);
+  });
+
+  describe.each([
+    {
+      type: "text",
+      valid: "Acero inoxidable",
+      invalid: 500,
+      options: [],
+      unit: null,
+    },
+    { type: "number", valid: 500, invalid: "500", options: [], unit: null },
+    { type: "boolean", valid: true, invalid: "true", options: [], unit: null },
+    {
+      type: "select",
+      valid: "automatic",
+      invalid: 1,
+      options: ["automatic", "manual"],
+      unit: null,
+    },
+    {
+      type: "multiselect",
+      valid: ["ice", "water"],
+      invalid: "ice",
+      options: ["ice", "water"],
+      unit: null,
+    },
+    {
+      type: "date",
+      valid: "2026-09-07",
+      invalid: "September 7",
+      options: [],
+      unit: null,
+    },
+    {
+      type: "measurement",
+      valid: { value: 500, unit: "kg/día" },
+      invalid: { value: "500", unit: "kg/día" },
+      options: [],
+      unit: "kg/día",
+    },
+  ])("$type dynamic attributes", ({ type, valid, invalid, options, unit }) => {
+    const createTypedRepository = () =>
+      createRepository({
+        getCategoryWithAttributes: vi.fn().mockResolvedValue({
+          id: categoryId,
+          attributes: [
+            {
+              id: "attribute-1",
+              key: "specification",
+              required: true,
+              type,
+              options,
+              unit,
+            },
+          ],
+        }),
+      });
+
+    it("accepts a valid value", async () => {
+      const repository = createTypedRepository();
+      const service = createCatalogService(repository);
+
+      await service.createProduct({
+        product,
+        attributes: { specification: valid },
+      });
+
+      expect(repository.createProduct).toHaveBeenCalledWith({
+        product,
+        attributes: { specification: valid },
+      });
+    });
+
+    it("rejects an invalid value and names its key", async () => {
+      const service = createCatalogService(createTypedRepository());
+
+      await expect(
+        service.createProduct({
+          product,
+          attributes: { specification: invalid },
+        }),
+      ).rejects.toThrow(/specification/);
+    });
+  });
+
+  it.each([
+    {
+      type: "select",
+      value: "unsupported",
+      options: ["automatic", "manual"],
+      unit: null,
+    },
+    {
+      type: "multiselect",
+      value: ["ice", "unsupported"],
+      options: ["ice", "water"],
+      unit: null,
+    },
+    {
+      type: "measurement",
+      value: { value: 500, unit: "lb/day" },
+      options: [],
+      unit: "kg/día",
+    },
+  ])("rejects invalid $type declarations and names the key", async (attribute) => {
+    const repository = createRepository({
+      getCategoryWithAttributes: vi.fn().mockResolvedValue({
+        id: categoryId,
+        attributes: [
+          {
+            id: "attribute-1",
+            key: "specification",
+            required: false,
+            ...attribute,
+          },
+        ],
+      }),
+    });
+    const service = createCatalogService(repository);
+
+    await expect(
+      service.createProduct({
+        product,
+        attributes: { specification: attribute.value },
+      }),
+    ).rejects.toThrow(/specification/);
+  });
+
+  it("rejects a supplied null value for an optional attribute", async () => {
+    const repository = createRepository({
+      getCategoryWithAttributes: vi.fn().mockResolvedValue({
+        id: categoryId,
+        attributes: [
+          {
+            id: "attribute-1",
+            key: "specification",
+            required: false,
+            type: "text",
+            options: [],
+            unit: null,
+          },
+        ],
+      }),
+    });
+    const service = createCatalogService(repository);
+
+    await expect(
+      service.createProduct({
+        product,
+        attributes: { specification: null },
+      }),
+    ).rejects.toThrow(/specification/);
   });
 });

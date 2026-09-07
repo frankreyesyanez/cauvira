@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
-import { createDatabase } from "@/db";
+import { createDatabase } from "@/db/create-database";
 import { categories, products } from "@/db/schema/catalog";
 import { DrizzleCatalogRepository } from "@/features/catalog/catalog.repository";
 import { env } from "@/lib/env";
@@ -86,6 +86,18 @@ describe("DrizzleCatalogRepository", () => {
         slug: product.slug,
       }),
     );
+    await expect(
+      repository.listPublishedProducts({
+        query: "resultado-inexistente",
+        categorySlug: category.slug,
+      }),
+    ).resolves.not.toContainEqual(expect.objectContaining({ id: product.id }));
+    await expect(
+      repository.listPublishedProducts({
+        query: "hielo 500",
+        categorySlug: `otra-categoria-${suffix}`,
+      }),
+    ).resolves.not.toContainEqual(expect.objectContaining({ id: product.id }));
   });
 
   it("does not expose unpublished products", async () => {
@@ -117,5 +129,41 @@ describe("DrizzleCatalogRepository", () => {
     await expect(repository.listPublishedProducts({})).resolves.not.toContainEqual(
       expect.objectContaining({ id: product.id }),
     );
+  });
+
+  it("rolls back product creation when an attribute is outside its category", async () => {
+    const suffix = randomUUID();
+    const category = await repository.createCategory({
+      name: "Equipos sin atributos",
+      slug: `equipos-sin-atributos-${suffix}`,
+      parentId: null,
+      attributes: [],
+    });
+    createdCategoryIds.push(category.id);
+    const slug = `producto-con-atributo-invalido-${suffix}`;
+
+    await expect(
+      repository.createProduct({
+        product: {
+          title: "Producto con atributo inválido",
+          slug,
+          categoryId: category.id,
+          purchaseMode: "quotation",
+          priceMinor: null,
+          summary: "Producto usado para comprobar la transacción.",
+          description: "",
+          published: false,
+        },
+        attributes: { outside_category: "invalid" },
+      }),
+    ).rejects.toThrow(/outside_category/);
+
+    const persistedProducts = await testDb
+      .select({ id: products.id })
+      .from(products)
+      .where(eq(products.slug, slug));
+    createdProductIds.push(...persistedProducts.map(({ id }) => id));
+
+    expect(persistedProducts).toEqual([]);
   });
 });

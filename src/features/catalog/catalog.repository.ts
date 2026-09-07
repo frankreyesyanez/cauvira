@@ -1,19 +1,29 @@
 import { and, eq, ilike, inArray, or } from "drizzle-orm";
-import type { createDatabase } from "@/db";
+import type { createDatabase } from "@/db/create-database";
 import {
   categories,
   categoryAttributes,
   productAttributeValues,
   products,
 } from "@/db/schema/catalog";
+import type { AttributeType } from "./catalog.contracts";
 import type { CreateCategoryInput, CreateProductInput } from "./catalog.validation";
 
 export type CategoryAttributeRecord = {
   id: string;
   key: string;
-  type: string;
+  type: AttributeType;
   required: boolean;
+  options: string[];
+  unit: string | null;
 };
+
+export type ProductAttributeValue =
+  | string
+  | number
+  | boolean
+  | string[]
+  | { value: number; unit: string };
 
 export type PublishedProductSummary = {
   id: string;
@@ -40,7 +50,7 @@ export interface CatalogRepository {
   ): Promise<{ id: string; attributes: CategoryAttributeRecord[] } | null>;
   createProduct(input: {
     product: CreateProductInput;
-    attributes: Record<string, unknown>;
+    attributes: Record<string, ProductAttributeValue>;
   }): Promise<{ id: string; slug: string }>;
   listPublishedProducts(input: {
     query?: string;
@@ -50,12 +60,6 @@ export interface CatalogRepository {
 }
 
 type Database = ReturnType<typeof createDatabase>;
-type ProductAttributeValue =
-  | string
-  | number
-  | boolean
-  | string[]
-  | { value: number; unit: string };
 
 export class DrizzleCatalogRepository implements CatalogRepository {
   constructor(private readonly database: Database) {}
@@ -105,6 +109,8 @@ export class DrizzleCatalogRepository implements CatalogRepository {
         key: categoryAttributes.key,
         type: categoryAttributes.type,
         required: categoryAttributes.required,
+        options: categoryAttributes.options,
+        unit: categoryAttributes.unit,
       })
       .from(categoryAttributes)
       .where(eq(categoryAttributes.categoryId, category.id));
@@ -114,7 +120,7 @@ export class DrizzleCatalogRepository implements CatalogRepository {
 
   async createProduct(input: {
     product: CreateProductInput;
-    attributes: Record<string, unknown>;
+    attributes: Record<string, ProductAttributeValue>;
   }) {
     return this.database.transaction(async (transaction) => {
       const [product] = await transaction
@@ -158,7 +164,7 @@ export class DrizzleCatalogRepository implements CatalogRepository {
             return {
               productId: product.id,
               attributeId,
-              value: value as ProductAttributeValue,
+              value,
             };
           }),
         );
