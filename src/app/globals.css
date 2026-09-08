@@ -761,6 +761,54 @@ select {
   font-size: 0.9rem;
 }
 
+.admin-form__grid--stack {
+  grid-template-columns: 1fr;
+}
+
+.sign-in {
+  width: min(100%, 38rem);
+  margin: 0 auto;
+  padding: clamp(1.5rem, 4vw, 4rem) clamp(1.25rem, 3vw, 2rem) 4rem;
+}
+
+.sign-in__brand {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0 0 2.5rem;
+}
+
+.sign-in__brand a {
+  color: var(--accent-acid);
+  font-family: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  text-decoration: none;
+}
+
+.sign-in__brand small {
+  color: var(--text-muted);
+}
+
+.sign-in__header {
+  border-bottom: 5px solid var(--ink-aubergine);
+  padding-bottom: 1.75rem;
+  margin-bottom: 1.75rem;
+}
+
+.sign-in__header h1 {
+  max-width: 8ch;
+  margin: 0.2rem 0 0.75rem;
+  font-size: clamp(3.5rem, 12vw, 6rem);
+  letter-spacing: -0.065em;
+  line-height: 0.9;
+}
+
+.sign-in__header p {
+  margin: 0;
+  color: var(--text-cream);
+}
+
 .field__control--textarea {
   min-height: 7rem;
   resize: vertical;

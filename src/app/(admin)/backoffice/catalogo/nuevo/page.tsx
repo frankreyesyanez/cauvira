@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ProductForm } from "@/components/catalog/product-form";
-import { createProductAction } from "@/features/catalog/catalog.actions";
+import { createProductAction } from "@/features/catalog/catalog.mutations";
 import { requireCatalogMutationAccess } from "@/features/catalog/catalog.authorization";
 import { createCatalogService } from "@/features/catalog/catalog.service";
 import { DrizzleCatalogRepository } from "@/features/catalog/catalog.repository";

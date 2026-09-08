@@ -1,5 +1,5 @@
 import { CategoryForm } from "@/components/catalog/category-form";
-import { createCategoryAction } from "@/features/catalog/catalog.actions";
+import { createCategoryAction } from "@/features/catalog/catalog.mutations";
 import { requireCatalogMutationAccess } from "@/features/catalog/catalog.authorization";
 import { createCatalogService } from "@/features/catalog/catalog.service";
 import { DrizzleCatalogRepository } from "@/features/catalog/catalog.repository";

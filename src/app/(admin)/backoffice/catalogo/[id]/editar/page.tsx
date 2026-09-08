@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProductForm } from "@/components/catalog/product-form";
 import { db } from "@/db";
-import { updateProductAction } from "@/features/catalog/catalog.actions";
+import { updateProductAction } from "@/features/catalog/catalog.mutations";
 import { requireCatalogMutationAccess } from "@/features/catalog/catalog.authorization";
 import { DrizzleCatalogRepository } from "@/features/catalog/catalog.repository";
 import { createCatalogService } from "@/features/catalog/catalog.service";

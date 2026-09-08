@@ -1,4 +1,3 @@
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { catalogMutationRoles } from "./catalog.authorization";
 import type { CategoryAttributeRecord } from "./catalog.repository";
@@ -293,62 +292,4 @@ export function createCatalogActions(dependencies: CatalogActionDependencies) {
       );
     },
   };
-}
-
-async function productionDependencies(): Promise<CatalogActionDependencies> {
-  const [{ requireCatalogMutationAccess }, { db }, { DrizzleCatalogRepository }, { createCatalogService }] =
-    await Promise.all([
-      import("./catalog.authorization"),
-      import("@/db"),
-      import("./catalog.repository"),
-      import("./catalog.service"),
-    ]);
-  const catalog = createCatalogService(new DrizzleCatalogRepository(db));
-
-  return {
-    authorize: () => requireCatalogMutationAccess(),
-    catalog,
-  };
-}
-
-export async function createCategoryAction(
-  formData: FormData,
-): Promise<CatalogActionResult> {
-  "use server";
-  const actions = createCatalogActions(await productionDependencies());
-  const result = await actions.createCategoryAction(formData);
-  if (result.ok) revalidatePath("/backoffice/categorias");
-  return result;
-}
-
-export async function createProductAction(
-  formData: FormData,
-): Promise<CatalogActionResult> {
-  "use server";
-  const actions = createCatalogActions(await productionDependencies());
-  const result = await actions.createProductAction(formData);
-  if (result.ok) revalidatePath("/backoffice/catalogo");
-  return result;
-}
-
-export async function updateCategoryAction(
-  id: string,
-  formData: FormData,
-): Promise<CatalogActionResult> {
-  "use server";
-  const actions = createCatalogActions(await productionDependencies());
-  const result = await actions.updateCategoryAction(id, formData);
-  if (result.ok) revalidatePath("/backoffice/categorias");
-  return result;
-}
-
-export async function updateProductAction(
-  id: string,
-  formData: FormData,
-): Promise<CatalogActionResult> {
-  "use server";
-  const actions = createCatalogActions(await productionDependencies());
-  const result = await actions.updateProductAction(id, formData);
-  if (result.ok) revalidatePath("/backoffice/catalogo");
-  return result;
 }

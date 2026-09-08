@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
       clearMocks: true,
       globals: true,
       env: testDatabaseEnv,
+      exclude: ["**/node_modules/**", "**/e2e/**", "**/.next/**", "**/dist/**"],
     },
   };
 });
