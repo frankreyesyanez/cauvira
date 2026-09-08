@@ -32,6 +32,15 @@ function createActions(
       quantity: number;
     }) => Promise<{ itemCount: number }>;
     getCart?: (cartId: string) => Promise<{ itemCount: number }>;
+    updateQuantity?: (input: {
+      cartId: string;
+      itemId: string;
+      quantity: number;
+    }) => Promise<{ itemCount: number }>;
+    removeItem?: (input: {
+      cartId: string;
+      itemId: string;
+    }) => Promise<{ itemCount: number }>;
   },
 ) {
   const createCart = overrides?.createCart ?? vi.fn().mockResolvedValue({ id: mintedId });
@@ -48,15 +57,30 @@ function createActions(
     vi.fn<(cartId: string) => Promise<{ itemCount: number }>>().mockResolvedValue({
       itemCount: 4,
     });
+  const updateQuantity =
+    overrides?.updateQuantity ??
+    vi.fn<(input: {
+      cartId: string;
+      itemId: string;
+      quantity: number;
+    }) => Promise<{ itemCount: number }>>().mockResolvedValue({ itemCount: 5 });
+  const removeItem =
+    overrides?.removeItem ??
+    vi.fn<(input: {
+      cartId: string;
+      itemId: string;
+    }) => Promise<{ itemCount: number }>>().mockResolvedValue({ itemCount: 0 });
 
   return {
     createCart,
     addItem,
     getCart,
+    updateQuantity,
+    removeItem,
     actions: createCartActions({
       cookies: () => jar,
       cartRepo: { createCart },
-      cart: { addItem, getCart },
+      cart: { addItem, getCart, updateQuantity, removeItem },
     }),
   };
 }
@@ -168,6 +192,36 @@ describe("cart actions", () => {
     await expect(unavailable.actions.addToCartAction(formData)).resolves.toEqual({
       ok: false,
       error: "product_unavailable",
+    });
+  });
+
+  it("updates a line quantity from form data", async () => {
+    const jar = cookieJar({ [CART_COOKIE]: cartId });
+    const { actions, updateQuantity } = createActions(jar);
+    const formData = new FormData();
+    formData.set("itemId", "item-1");
+    formData.set("quantity", "7");
+
+    await actions.updateCartItemQuantityAction(formData);
+
+    expect(updateQuantity).toHaveBeenCalledWith({
+      cartId,
+      itemId: "item-1",
+      quantity: 7,
+    });
+  });
+
+  it("removes a line from form data", async () => {
+    const jar = cookieJar({ [CART_COOKIE]: cartId });
+    const { actions, removeItem } = createActions(jar);
+    const formData = new FormData();
+    formData.set("itemId", "item-1");
+
+    await actions.removeCartItemAction(formData);
+
+    expect(removeItem).toHaveBeenCalledWith({
+      cartId,
+      itemId: "item-1",
     });
   });
 });

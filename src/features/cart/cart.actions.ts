@@ -16,6 +16,12 @@ type CartActionService = {
     input: Parameters<ReturnType<typeof createCartService>["addItem"]>[0],
   ): Promise<{ itemCount: number }>;
   getCart(cartId: string): Promise<{ itemCount: number }>;
+  updateQuantity(
+    input: Parameters<ReturnType<typeof createCartService>["updateQuantity"]>[0],
+  ): Promise<{ itemCount: number }>;
+  removeItem(
+    input: Parameters<ReturnType<typeof createCartService>["removeItem"]>[0],
+  ): Promise<{ itemCount: number }>;
 };
 
 type CartActionDependencies = {
@@ -103,9 +109,38 @@ export function createCartActions(dependencies: CartActionDependencies) {
     }
   }
 
+  async function updateCartItemQuantityAction(formData: FormData) {
+    const itemId = String(formData.get("itemId") ?? "").trim();
+    const quantity = parseQuantity(formData.get("quantity"));
+    if (!itemId) return;
+
+    try {
+      const cartId = await ensureCartId();
+      await dependencies.cart.updateQuantity({ cartId, itemId, quantity });
+    } catch (error) {
+      if (error instanceof CartInputError) return;
+      throw error;
+    }
+  }
+
+  async function removeCartItemAction(formData: FormData) {
+    const itemId = String(formData.get("itemId") ?? "").trim();
+    if (!itemId) return;
+
+    try {
+      const cartId = await ensureCartId();
+      await dependencies.cart.removeItem({ cartId, itemId });
+    } catch (error) {
+      if (error instanceof CartInputError) return;
+      throw error;
+    }
+  }
+
   return {
     ensureCartId,
     getBagItemCount,
     addToCartAction,
+    updateCartItemQuantityAction,
+    removeCartItemAction,
   };
 }

@@ -17,14 +17,29 @@ function productionActions() {
   });
 }
 
+function revalidateStorefront() {
+  revalidatePath("/");
+  revalidatePath("/productos");
+  revalidatePath("/productos/[slug]", "page");
+  revalidatePath("/bolsa");
+}
+
 export async function addToCartAction(formData: FormData) {
   const result = await productionActions().addToCartAction(formData);
   if (result.ok) {
-    revalidatePath("/");
-    revalidatePath("/productos");
-    revalidatePath("/productos/[slug]", "page");
+    revalidateStorefront();
   }
   return result;
+}
+
+export async function updateCartItemQuantityAction(formData: FormData) {
+  await productionActions().updateCartItemQuantityAction(formData);
+  revalidateStorefront();
+}
+
+export async function removeCartItemAction(formData: FormData) {
+  await productionActions().removeCartItemAction(formData);
+  revalidateStorefront();
 }
 
 export async function getBagItemCount() {
