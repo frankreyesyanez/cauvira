@@ -6,12 +6,18 @@ type StoreChromeProps = {
   categories: AdminCategorySummary[];
   defaultQuery?: string;
   showSearch?: boolean;
+  bagCount?: number;
 };
+
+function bagAriaLabel(bagCount: number) {
+  return `Bolsa, ${bagCount} ${bagCount === 1 ? "artículo" : "artículos"}`;
+}
 
 export function StoreChrome({
   categories,
   defaultQuery,
   showSearch = true,
+  bagCount,
 }: StoreChromeProps) {
   return (
     <>
@@ -31,8 +37,14 @@ export function StoreChrome({
           <Link className="store-header__action" href="/cuenta">
             Cuenta
           </Link>
-          <Link className="store-header__action" href="/bolsa">
-            Bolsa
+          <Link
+            className="store-header__action"
+            href="/bolsa"
+            aria-label={bagCount === undefined ? "Bolsa" : bagAriaLabel(bagCount)}
+          >
+            <span data-testid="bag-count">
+              {bagCount === undefined ? "Bolsa" : `Bolsa (${bagCount})`}
+            </span>
           </Link>
         </nav>
       </header>

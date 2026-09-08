@@ -9,14 +9,15 @@ import { StoreChrome } from "@/components/catalog/store-chrome";
 type HomeViewProps = {
   products: PublishedProductSummary[];
   categories: AdminCategorySummary[];
+  bagCount?: number;
 };
 
-export function HomeView({ products, categories }: HomeViewProps) {
+export function HomeView({ products, categories, bagCount }: HomeViewProps) {
   const featuredProduct = products[0];
 
   return (
     <main className="store-home">
-      <StoreChrome categories={categories} />
+      <StoreChrome bagCount={bagCount} categories={categories} />
       <section
         aria-labelledby="home-title"
         className="store-first-viewport"

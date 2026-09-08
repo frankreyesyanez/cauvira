@@ -4,6 +4,7 @@ import { DrizzleCatalogRepository } from "@/features/catalog/catalog.repository"
 import { ProductCard } from "@/components/catalog/product-card";
 import { getListingEmptyMessage } from "@/components/catalog/listing-empty-message";
 import { StoreChrome } from "@/components/catalog/store-chrome";
+import { getBagItemCount } from "@/features/cart/cart.mutations";
 import { db } from "@/db";
 
 export const dynamic = "force-dynamic";
@@ -21,12 +22,13 @@ export default async function ProductListingPage({
   const filters = await searchParams;
   const query = filters.q?.trim() || undefined;
   const catalog = createCatalogService(new DrizzleCatalogRepository(db));
-  const [products, categories] = await Promise.all([
+  const [products, categories, bagCount] = await Promise.all([
     catalog.listPublishedProducts({
       query,
       categorySlug: filters.categoria || undefined,
     }),
     catalog.listCategories(),
+    getBagItemCount(),
   ]);
   const activeCategory = categories.find(
     (category) => category.slug === filters.categoria,
@@ -34,7 +36,11 @@ export default async function ProductListingPage({
 
   return (
     <main className="store-listing">
-      <StoreChrome categories={categories} defaultQuery={filters.q} />
+      <StoreChrome
+        bagCount={bagCount}
+        categories={categories}
+        defaultQuery={filters.q}
+      />
       <header className="store-listing__header">
         <div>
           <p className="store-listing__eyebrow">Catálogo / búsqueda</p>

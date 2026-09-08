@@ -7,6 +7,7 @@ import { getProductAction } from "@/components/catalog/product-detail-action";
 import { ProductMedia } from "@/components/catalog/product-media";
 import { catalogImageSrc } from "@/lib/catalog-image";
 import { StoreChrome } from "@/components/catalog/store-chrome";
+import { getBagItemCount } from "@/features/cart/cart.mutations";
 import { formatMxn } from "@/lib/money";
 import { db } from "@/db";
 
@@ -47,9 +48,10 @@ function ProductPrice({
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const { slug } = await params;
   const catalog = createCatalogService(new DrizzleCatalogRepository(db));
-  const [product, categories] = await Promise.all([
+  const [product, categories, bagCount] = await Promise.all([
     catalog.getPublishedProductBySlug(slug),
     catalog.listCategories(),
+    getBagItemCount(),
   ]);
 
   if (!product) {
@@ -60,7 +62,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
   return (
     <main className="product-detail">
-      <StoreChrome categories={categories} showSearch={false} />
+      <StoreChrome bagCount={bagCount} categories={categories} showSearch={false} />
       <article className="product-detail__layout">
         <div className="product-detail__media">
           <p className="product-detail__media-label">Imagen principal</p>
