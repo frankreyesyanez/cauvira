@@ -89,6 +89,20 @@ it("marks and focuses the first incomplete required group on click without a sel
   expect(voltaje).toHaveFocus();
 });
 
+it("does not expose a file upload on the storefront product detail", () => {
+  const { container } = render(
+    <main className="product-detail">
+      <ProductConfigure
+        optionGroups={optionGroups}
+        priceMinor={18_990_000}
+        productId="ice-1"
+      />
+    </main>,
+  );
+
+  expect(container.querySelector(".product-detail input[type=file]")).toBeNull();
+});
+
 it("submits only productId when the product has no option groups", () => {
   renderConfigure([], 38_900);
 

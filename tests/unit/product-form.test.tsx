@@ -97,6 +97,47 @@ it("requires public price for every purchase mode", () => {
   expect(screen.getByLabelText(/precio público/i)).toBeRequired();
 });
 
+it("does not show a photo upload on create", () => {
+  render(<ProductForm action={vi.fn()} categories={categories} />);
+
+  expect(document.querySelector('input[type="file"]')).toBeNull();
+});
+
+it("shows a photo gallery and upload on edit", () => {
+  render(
+    <ProductForm
+      action={vi.fn()}
+      categories={categories}
+      initialProduct={{
+        title: "Máquina existente",
+        slug: "maquina-existente",
+        categoryId: categories[0].id,
+        purchaseMode: "starting_price",
+        priceMinor: 12500050,
+        summary: "Resumen existente del producto.",
+        description: "Descripción existente.",
+        published: true,
+        attributes: {
+          daily_output: { value: 500, unit: "kg/día" },
+        },
+        images: [
+          {
+            id: "img-cover",
+            url: "https://cdn.example/product-images/cover.jpg",
+            sortOrder: 0,
+          },
+        ],
+      }}
+    />,
+  );
+
+  expect(document.querySelector('input[type="file"]')).toBeInTheDocument();
+  expect(screen.getByRole("img", { name: /foto 1/i })).toBeVisible();
+  expect(screen.getByRole("button", { name: /subir/i })).toBeVisible();
+  expect(screen.getByRole("button", { name: /bajar/i })).toBeVisible();
+  expect(screen.getByRole("button", { name: /eliminar/i })).toBeVisible();
+});
+
 it("prefills editable product values and inherited attributes", () => {
   render(
     <ProductForm

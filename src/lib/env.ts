@@ -22,12 +22,24 @@ const postgresUrl = z.string().superRefine((value, ctx) => {
   }
 });
 
+function emptyToUndefined(value: unknown) {
+  if (typeof value === "string" && value.trim() === "") {
+    return undefined;
+  }
+  return value;
+}
+
 const envSchema = z.object({
   DATABASE_URL: postgresUrl,
   MIGRATION_DATABASE_URL: postgresUrl,
   TEST_DATABASE_URL: postgresUrl,
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
+  SUPABASE_URL: z.preprocess(emptyToUndefined, z.url().optional()),
+  SUPABASE_SERVICE_ROLE_KEY: z.preprocess(
+    emptyToUndefined,
+    z.string().min(1).optional(),
+  ),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

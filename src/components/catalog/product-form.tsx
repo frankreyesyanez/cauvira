@@ -7,6 +7,7 @@ import { Field } from "@/components/ui/field";
 import type { CatalogActionResult } from "@/features/catalog/catalog.actions";
 import type { AttributeType } from "@/features/catalog/catalog.contracts";
 import type { CatalogOptionGroup } from "@/features/catalog/pricing";
+import type { ProductImageActionResult } from "@/features/media/product-image.validation";
 
 export type ProductFormCategory = {
   id: string;
@@ -22,9 +23,25 @@ export type ProductFormCategory = {
   }>;
 };
 
+export type ProductFormImage = {
+  id: string;
+  url: string;
+  sortOrder: number;
+};
+
+type ProductImageActions = {
+  upload?(formData: FormData): Promise<ProductImageActionResult>;
+  reorder?(
+    imageId: string,
+    direction: "up" | "down",
+  ): Promise<ProductImageActionResult>;
+  delete?(imageId: string): Promise<ProductImageActionResult>;
+};
+
 type ProductFormProps = {
   action(formData: FormData): Promise<CatalogActionResult>;
   categories: ProductFormCategory[];
+  imageActions?: ProductImageActions;
   initialProduct?: {
     title: string;
     slug: string;
@@ -36,6 +53,7 @@ type ProductFormProps = {
     published: boolean;
     attributes: Record<string, unknown>;
     optionGroups?: CatalogOptionGroup[];
+    images?: ProductFormImage[];
   };
 };
 
@@ -196,9 +214,144 @@ function DynamicField({
   );
 }
 
+function ProductImageGallery({
+  imageActions,
+  initialImages,
+}: {
+  imageActions?: ProductImageActions;
+  initialImages: ProductFormImage[];
+}) {
+  const [images, setImages] = useState(initialImages);
+  const [result, setResult] = useState<ProductImageActionResult | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const errors = result && !result.ok ? result.fieldErrors.images : undefined;
+  const sorted = [...images].sort(
+    (left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id),
+  );
+
+  function apply(task: () => Promise<ProductImageActionResult>) {
+    startTransition(async () => {
+      const next = await task();
+      setResult(next);
+      if (next.ok) {
+        setImages(next.images);
+      }
+    });
+  }
+
+  function submitUpload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!imageActions?.upload) return;
+    const formData = new FormData(event.currentTarget);
+    apply(() => imageActions.upload!(formData));
+    event.currentTarget.reset();
+  }
+
+  return (
+    <fieldset className="admin-form__section">
+      <legend>Fotos del producto</legend>
+      <p className="admin-form__note">
+        La foto con orden 0 es la portada. JPG, PNG o WebP, máximo 5 MB y 12
+        fotos.
+      </p>
+      {errors ? <ControlError error={errors} id="product-images-error" /> : null}
+      {sorted.length === 0 ? (
+        <p className="admin-form__note">Aún no hay fotos. Sube la portada primero.</p>
+      ) : (
+        <ul className="product-photos">
+          {sorted.map((image, index) => (
+            <li className="product-photos__item" key={image.id}>
+              <figure className="product-photos__figure">
+                {/* Public Storage URLs vary by project; next/image needs a fixed host list. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  alt={`Foto ${index + 1}`}
+                  className="product-photos__thumb"
+                  src={image.url}
+                />
+                <figcaption>
+                  {image.sortOrder === 0 ? (
+                    <span className="product-photos__cover">Portada</span>
+                  ) : (
+                    `Foto ${index + 1}`
+                  )}
+                </figcaption>
+              </figure>
+              <div className="product-photos__actions">
+                <Button
+                  aria-label={`Subir foto ${index + 1}`}
+                  disabled={isPending || index === 0}
+                  onClick={() =>
+                    imageActions?.reorder &&
+                    apply(() => imageActions.reorder!(image.id, "up"))
+                  }
+                  type="button"
+                  variant="ghost"
+                >
+                  Subir
+                </Button>
+                <Button
+                  aria-label={`Bajar foto ${index + 1}`}
+                  disabled={isPending || index === sorted.length - 1}
+                  onClick={() =>
+                    imageActions?.reorder &&
+                    apply(() => imageActions.reorder!(image.id, "down"))
+                  }
+                  type="button"
+                  variant="ghost"
+                >
+                  Bajar
+                </Button>
+                <Button
+                  aria-label={`Eliminar foto ${index + 1}`}
+                  disabled={isPending}
+                  onClick={() =>
+                    imageActions?.delete &&
+                    apply(() => imageActions.delete!(image.id))
+                  }
+                  type="button"
+                  variant="danger"
+                >
+                  Eliminar
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form className="product-photos__upload" onSubmit={submitUpload}>
+        <div className="field">
+          <label className="field__label" htmlFor="product-image">
+            Subir foto
+          </label>
+          <input
+            accept="image/jpeg,image/png,image/webp"
+            aria-describedby={
+              errors ? "product-image-help product-images-error" : "product-image-help"
+            }
+            aria-invalid={errors ? true : undefined}
+            className="field__control"
+            disabled={isPending || sorted.length >= 12}
+            id="product-image"
+            name="image"
+            type="file"
+          />
+          <p className="field__description" id="product-image-help">
+            Disponible solo al editar un producto existente.
+          </p>
+        </div>
+        <Button disabled={sorted.length >= 12} loading={isPending} type="submit">
+          Cargar foto
+        </Button>
+      </form>
+    </fieldset>
+  );
+}
+
 export function ProductForm({
   action,
   categories,
+  imageActions,
   initialProduct,
 }: ProductFormProps) {
   const [selectedCategoryId, setSelectedCategoryId] = useState(
@@ -234,6 +387,13 @@ export function ProductForm({
   }
 
   return (
+    <div className="admin-form-stack">
+      {initialProduct ? (
+        <ProductImageGallery
+          imageActions={imageActions}
+          initialImages={initialProduct.images ?? []}
+        />
+      ) : null}
     <form
       action={
         action as unknown as (formData: FormData) => Promise<void>
@@ -431,5 +591,6 @@ export function ProductForm({
         </Button>
       </div>
     </form>
+    </div>
   );
 }

@@ -6,6 +6,11 @@ import { updateProductAction } from "@/features/catalog/catalog.mutations";
 import { requireCatalogMutationAccess } from "@/features/catalog/catalog.authorization";
 import { DrizzleCatalogRepository } from "@/features/catalog/catalog.repository";
 import { createCatalogService } from "@/features/catalog/catalog.service";
+import {
+  deleteProductImageAction,
+  reorderProductImageAction,
+  uploadProductImageAction,
+} from "@/features/media/product-image.actions";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +48,11 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
       <ProductForm
         action={updateProductAction.bind(null, id)}
         categories={categories}
+        imageActions={{
+          upload: uploadProductImageAction.bind(null, id),
+          reorder: reorderProductImageAction.bind(null, id),
+          delete: deleteProductImageAction.bind(null, id),
+        }}
         initialProduct={{
           title: product.title,
           slug: product.slug,
@@ -54,6 +64,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
           published: product.published,
           attributes: product.attributes,
           optionGroups: product.optionGroups,
+          images: product.images,
         }}
       />
     </main>

@@ -106,4 +106,20 @@ describe("parseEnv", () => {
   it("accepts the Supabase development environment", () => {
     expect(parseEnv(validEnv).BETTER_AUTH_URL).toBe("http://localhost:3000");
   });
+
+  it("keeps SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY optional", () => {
+    const parsed = parseEnv(validEnv);
+    expect(parsed.SUPABASE_URL).toBeUndefined();
+    expect(parsed.SUPABASE_SERVICE_ROLE_KEY).toBeUndefined();
+  });
+
+  it("accepts optional Supabase storage keys when present", () => {
+    const parsed = parseEnv({
+      ...validEnv,
+      SUPABASE_URL: "https://project.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+    });
+    expect(parsed.SUPABASE_URL).toBe("https://project.supabase.co");
+    expect(parsed.SUPABASE_SERVICE_ROLE_KEY).toBe("service-role-key");
+  });
 });
