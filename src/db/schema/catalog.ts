@@ -34,11 +34,35 @@ export const products = pgTable("products", {
   summary: text("summary").notNull(),
   description: text("description").default("").notNull(),
   purchaseMode: purchaseModeEnum("purchase_mode").notNull(),
-  priceMinor: integer("price_minor"),
+  priceMinor: integer("price_minor").notNull(),
   published: boolean("published").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [uniqueIndex("products_slug_unique").on(table.slug)]);
+
+export const productOptionGroups = pgTable("product_option_groups", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  productId: uuid("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  name: text("name").notNull(),
+  required: boolean("required").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+});
+
+export const productOptionValues = pgTable("product_option_values", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  groupId: uuid("group_id").references(() => productOptionGroups.id, { onDelete: "cascade" }).notNull(),
+  label: text("label").notNull(),
+  priceDeltaMinor: integer("price_delta_minor").notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+});
+
+export const productImages = pgTable("product_images", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  productId: uuid("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  url: text("url").notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
 
 export const productAttributeValues = pgTable("product_attribute_values", {
   id: uuid("id").defaultRandom().primaryKey(),

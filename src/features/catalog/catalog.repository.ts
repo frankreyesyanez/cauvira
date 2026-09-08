@@ -37,7 +37,7 @@ export type AdminProductSummary = {
   categoryId: string;
   categoryName: string;
   purchaseMode: PurchaseMode;
-  priceMinor: number | null;
+  priceMinor: number;
   published: boolean;
   updatedAt: Date;
 };
@@ -61,7 +61,7 @@ export type PublishedProductSummary = {
   slug: string;
   summary: string;
   purchaseMode: string;
-  priceMinor: number | null;
+  priceMinor: number;
 };
 
 export type PublishedProductDetail = PublishedProductSummary & {
