@@ -1,4 +1,5 @@
 import { roles } from "@/db/schema/auth";
+import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import {
   requireRole,
   UnauthorizedError,
@@ -14,8 +15,12 @@ type BackofficeLayoutProps = {
 export default async function BackofficeLayout({
   children,
 }: BackofficeLayoutProps) {
+  let canManageCatalog = false;
   try {
-    await requireRole(await headers(), roles);
+    const session = await requireRole(await headers(), roles);
+    canManageCatalog =
+      session.user.role === "administrator" ||
+      session.user.role === "catalog_manager";
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return redirect("/ingresar");
@@ -24,5 +29,10 @@ export default async function BackofficeLayout({
     throw error;
   }
 
-  return <>{children}</>;
+  return (
+    <div className="admin-shell">
+      <AdminSidebar canManageCatalog={canManageCatalog} />
+      <div className="admin-shell__content">{children}</div>
+    </div>
+  );
 }

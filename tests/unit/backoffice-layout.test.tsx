@@ -8,7 +8,10 @@ const { getHeaders, redirect, requireRole } = vi.hoisted(() => ({
 }));
 
 vi.mock("next/headers", () => ({ headers: getHeaders }));
-vi.mock("next/navigation", () => ({ redirect }));
+vi.mock("next/navigation", () => ({
+  redirect,
+  usePathname: () => "/backoffice/catalogo",
+}));
 vi.mock("@/features/auth/require-role", () => ({
   requireRole,
   UnauthorizedError: class UnauthorizedError extends Error {},

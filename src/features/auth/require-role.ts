@@ -8,9 +8,18 @@ export class UnauthorizedError extends Error {
   }
 }
 
+export class ForbiddenError extends Error {
+  readonly status = 403;
+
+  constructor() {
+    super("Forbidden");
+    this.name = "ForbiddenError";
+  }
+}
+
 export const assertAllowedRole = (role: Role, allowedRoles: readonly Role[]) => {
   if (!allowedRoles.includes(role)) {
-    throw new Error("Forbidden");
+    throw new ForbiddenError();
   }
 };
 

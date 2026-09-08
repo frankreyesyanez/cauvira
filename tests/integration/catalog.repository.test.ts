@@ -98,6 +98,34 @@ describe("DrizzleCatalogRepository", () => {
         categorySlug: `otra-categoria-${suffix}`,
       }),
     ).resolves.not.toContainEqual(expect.objectContaining({ id: product.id }));
+
+    await expect(repository.listCategories()).resolves.toContainEqual(
+      expect.objectContaining({
+        id: category.id,
+        attributes: [
+          expect.objectContaining({
+            key: "daily_output",
+            label: "Producción diaria",
+          }),
+        ],
+      }),
+    );
+    await expect(
+      repository.listAdminProducts({
+        query: "hielo 500",
+        categoryId: category.id,
+        status: "published",
+      }),
+    ).resolves.toContainEqual(
+      expect.objectContaining({
+        id: product.id,
+        categoryName: "Máquinas de hielo",
+        published: true,
+      }),
+    );
+    await expect(
+      repository.listAdminProducts({ status: "draft" }),
+    ).resolves.not.toContainEqual(expect.objectContaining({ id: product.id }));
   });
 
   it("does not expose unpublished products", async () => {
@@ -128,6 +156,14 @@ describe("DrizzleCatalogRepository", () => {
     await expect(repository.getPublishedProductBySlug(product.slug)).resolves.toBeNull();
     await expect(repository.listPublishedProducts({})).resolves.not.toContainEqual(
       expect.objectContaining({ id: product.id }),
+    );
+    await expect(
+      repository.listAdminProducts({ status: "draft" }),
+    ).resolves.toContainEqual(
+      expect.objectContaining({
+        id: product.id,
+        published: false,
+      }),
     );
   });
 

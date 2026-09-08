@@ -12,6 +12,7 @@ vi.mock("@/lib/auth", () => ({
 
 import {
   assertAllowedRole,
+  ForbiddenError,
   requireRole,
   UnauthorizedError,
 } from "@/features/auth/require-role";
@@ -25,7 +26,12 @@ describe("assertAllowedRole", () => {
   });
 
   it("rejects sales from catalog administration", () => {
-    expect(() => assertAllowedRole("sales", catalogRoles)).toThrow(/forbidden/i);
+    expect(() => assertAllowedRole("sales", catalogRoles)).toThrow(ForbiddenError);
+    try {
+      assertAllowedRole("sales", catalogRoles);
+    } catch (error) {
+      expect(error).toMatchObject({ status: 403 });
+    }
   });
 });
 

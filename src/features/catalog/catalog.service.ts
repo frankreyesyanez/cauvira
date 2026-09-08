@@ -74,6 +74,22 @@ export const createCatalogService = (repository: CatalogRepository) => ({
     return repository.createCategory(createCategorySchema.parse(input));
   },
 
+  getCategoryWithAttributes(id: string) {
+    return repository.getCategoryWithAttributes(id);
+  },
+
+  listCategories() {
+    return repository.listCategories();
+  },
+
+  listAdminProducts(input: {
+    query?: string;
+    categoryId?: string;
+    status?: "published" | "draft";
+  }) {
+    return repository.listAdminProducts(input);
+  },
+
   async createProduct(input: {
     product: unknown;
     attributes: Record<string, unknown>;

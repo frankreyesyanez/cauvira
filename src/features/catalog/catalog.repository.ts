@@ -1,4 +1,4 @@
-import { and, eq, ilike, inArray, or } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import type { createDatabase } from "@/db/create-database";
 import {
   categories,
@@ -12,10 +12,31 @@ import type { CreateCategoryInput, CreateProductInput } from "./catalog.validati
 export type CategoryAttributeRecord = {
   id: string;
   key: string;
+  label: string;
   type: AttributeType;
   required: boolean;
   options: string[];
   unit: string | null;
+};
+
+export type AdminCategorySummary = {
+  id: string;
+  name: string;
+  slug: string;
+  parentId: string | null;
+  attributes: CategoryAttributeRecord[];
+};
+
+export type AdminProductSummary = {
+  id: string;
+  title: string;
+  slug: string;
+  categoryId: string;
+  categoryName: string;
+  purchaseMode: string;
+  priceMinor: number | null;
+  published: boolean;
+  updatedAt: Date;
 };
 
 export type ProductAttributeValue =
@@ -52,6 +73,12 @@ export interface CatalogRepository {
     product: CreateProductInput;
     attributes: Record<string, ProductAttributeValue>;
   }): Promise<{ id: string; slug: string }>;
+  listCategories(): Promise<AdminCategorySummary[]>;
+  listAdminProducts(input: {
+    query?: string;
+    categoryId?: string;
+    status?: "published" | "draft";
+  }): Promise<AdminProductSummary[]>;
   listPublishedProducts(input: {
     query?: string;
     categorySlug?: string;
@@ -107,6 +134,7 @@ export class DrizzleCatalogRepository implements CatalogRepository {
       .select({
         id: categoryAttributes.id,
         key: categoryAttributes.key,
+        label: categoryAttributes.label,
         type: categoryAttributes.type,
         required: categoryAttributes.required,
         options: categoryAttributes.options,
@@ -116,6 +144,85 @@ export class DrizzleCatalogRepository implements CatalogRepository {
       .where(eq(categoryAttributes.categoryId, category.id));
 
     return { id: category.id, attributes };
+  }
+
+  async listCategories(): Promise<AdminCategorySummary[]> {
+    const categoryRows = await this.database
+      .select({
+        id: categories.id,
+        name: categories.name,
+        slug: categories.slug,
+        parentId: categories.parentId,
+      })
+      .from(categories)
+      .orderBy(categories.name);
+    const attributeRows = await this.database
+      .select({
+        id: categoryAttributes.id,
+        categoryId: categoryAttributes.categoryId,
+        key: categoryAttributes.key,
+        label: categoryAttributes.label,
+        type: categoryAttributes.type,
+        required: categoryAttributes.required,
+        options: categoryAttributes.options,
+        unit: categoryAttributes.unit,
+      })
+      .from(categoryAttributes)
+      .orderBy(categoryAttributes.label);
+
+    return categoryRows.map((category) => ({
+      ...category,
+      attributes: attributeRows
+        .filter((attribute) => attribute.categoryId === category.id)
+        .map((attribute) => ({
+          id: attribute.id,
+          key: attribute.key,
+          label: attribute.label,
+          type: attribute.type,
+          required: attribute.required,
+          options: attribute.options,
+          unit: attribute.unit,
+        })),
+    }));
+  }
+
+  async listAdminProducts(input: {
+    query?: string;
+    categoryId?: string;
+    status?: "published" | "draft";
+  }): Promise<AdminProductSummary[]> {
+    const conditions = [];
+    if (input.query) {
+      conditions.push(
+        or(
+          ilike(products.title, `%${input.query}%`),
+          ilike(products.summary, `%${input.query}%`),
+        )!,
+      );
+    }
+    if (input.categoryId) {
+      conditions.push(eq(products.categoryId, input.categoryId));
+    }
+    if (input.status) {
+      conditions.push(eq(products.published, input.status === "published"));
+    }
+
+    return this.database
+      .select({
+        id: products.id,
+        title: products.title,
+        slug: products.slug,
+        categoryId: products.categoryId,
+        categoryName: categories.name,
+        purchaseMode: products.purchaseMode,
+        priceMinor: products.priceMinor,
+        published: products.published,
+        updatedAt: products.updatedAt,
+      })
+      .from(products)
+      .innerJoin(categories, eq(products.categoryId, categories.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(products.updatedAt));
   }
 
   async createProduct(input: {
