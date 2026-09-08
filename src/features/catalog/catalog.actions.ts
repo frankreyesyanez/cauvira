@@ -43,14 +43,32 @@ const messageByField: Record<string, string> = {
   description: "La descripción excede la longitud permitida.",
   purchaseMode: "Selecciona una modalidad de compra válida.",
   priceMinor: "Ingresa un precio válido mayor a cero.",
+  optionGroups: "Revisa los grupos de opciones del producto.",
 };
+
+function messageForIssue(issue: z.ZodIssue) {
+  const field = issue.path.join(".") || "_form";
+  if (messageByField[field]) return messageByField[field];
+
+  const leaf = String(issue.path.at(-1) ?? "");
+  if (issue.path[0] === "optionGroups") {
+    if (leaf === "name") return "Escribe el nombre del grupo de opciones.";
+    if (leaf === "label") return "Escribe el nombre de la opción.";
+    if (leaf === "values") return "Agrega al menos un valor al grupo.";
+    if (leaf === "priceDeltaMinor") return "Ingresa un cargo válido de cero o mayor.";
+    if (leaf === "sortOrder") return "Ingresa un orden válido.";
+    return messageByField.optionGroups ?? issue.message;
+  }
+
+  return issue.message;
+}
 
 function zodFieldErrors(error: z.ZodError) {
   const errors: Record<string, string[]> = {};
   for (const issue of error.issues) {
     const field = issue.path.join(".") || "_form";
     errors[field] ??= [];
-    errors[field].push(messageByField[field] ?? issue.message);
+    errors[field].push(messageForIssue(issue));
   }
   return errors;
 }
@@ -96,6 +114,49 @@ function parsePriceMinor(value: FormDataEntryValue | null) {
   if (!normalized) return null;
   const pesos = Number(normalized);
   return Number.isFinite(pesos) ? Math.round(pesos * 100) : Number.NaN;
+}
+
+function parseSortOrder(value: FormDataEntryValue | null, fallback: number) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return fallback;
+  const parsed = Number(normalized);
+  return Number.isInteger(parsed) ? parsed : Number.NaN;
+}
+
+function optionGroupsFromFormData(formData: FormData) {
+  const groupIndexes = new Set<number>();
+  for (const key of formData.keys()) {
+    const match = /^optionGroups\.(\d+)\./.exec(key);
+    if (match) groupIndexes.add(Number(match[1]));
+  }
+
+  return [...groupIndexes].sort((a, b) => a - b).map((groupIndex) => {
+    const prefix = `optionGroups.${groupIndex}`;
+    const valueIndexes = new Set<number>();
+    for (const key of formData.keys()) {
+      const match = new RegExp(`^${prefix.replaceAll(".", "\\.")}\\.values\\.(\\d+)\\.`).exec(
+        key,
+      );
+      if (match) valueIndexes.add(Number(match[1]));
+    }
+
+    return {
+      name: formData.get(`${prefix}.name`),
+      required: formData.has(`${prefix}.required`),
+      sortOrder: parseSortOrder(formData.get(`${prefix}.sortOrder`), groupIndex),
+      values: [...valueIndexes].sort((a, b) => a - b).map((valueIndex) => {
+        const valuePrefix = `${prefix}.values.${valueIndex}`;
+        return {
+          label: formData.get(`${valuePrefix}.label`),
+          priceDeltaMinor: parsePriceMinor(formData.get(`${valuePrefix}.price`)),
+          sortOrder: parseSortOrder(
+            formData.get(`${valuePrefix}.sortOrder`),
+            valueIndex,
+          ),
+        };
+      }),
+    };
+  });
 }
 
 function dynamicAttributesFromFormData(
@@ -219,6 +280,7 @@ export function createCatalogActions(dependencies: CatalogActionDependencies) {
       summary: formData.get("summary"),
       description: formData.get("description") ?? "",
       published: formData.has("published"),
+      optionGroups: optionGroupsFromFormData(formData),
     };
     const parsed = createProductSchema.safeParse(product);
     if (!parsed.success) {

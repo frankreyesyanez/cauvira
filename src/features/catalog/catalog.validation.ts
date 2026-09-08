@@ -44,27 +44,31 @@ export const createCategorySchema = z.object({
   attributes: z.array(categoryAttributeSchema),
 });
 
+export const productOptionValueSchema = z.object({
+  id: z.uuid().optional(),
+  label: z.string().trim().min(1).max(80),
+  priceDeltaMinor: z.int().min(0),
+  sortOrder: z.int().min(0),
+});
+
+export const productOptionGroupSchema = z.object({
+  id: z.uuid().optional(),
+  name: z.string().trim().min(1).max(80),
+  required: z.boolean().default(true),
+  sortOrder: z.int().min(0),
+  values: z.array(productOptionValueSchema).min(1),
+});
+
 export const createProductSchema = z.object({
   title: z.string().trim().min(3).max(160),
   slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   categoryId: z.uuid(),
   purchaseMode: z.enum(purchaseModes),
-  priceMinor: z.int().positive().nullable(),
+  priceMinor: z.int().positive(),
   summary: z.string().trim().min(10).max(300),
   description: z.string().trim().max(10_000).default(""),
   published: z.boolean().default(false),
-}).superRefine((value, context) => {
-  if (
-    (value.purchaseMode === "direct_purchase" ||
-      value.purchaseMode === "starting_price") &&
-    value.priceMinor === null
-  ) {
-    context.addIssue({
-      code: "custom",
-      path: ["priceMinor"],
-      message: "priceMinor is required for priced purchase modes",
-    });
-  }
+  optionGroups: z.array(productOptionGroupSchema).default([]),
 });
 
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;

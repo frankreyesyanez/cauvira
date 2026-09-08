@@ -89,9 +89,53 @@ describe("createProductSchema", () => {
     ).toThrow(/priceMinor/);
   });
 
-  it("allows quotation products without a public price", () => {
+  it("requires a positive price for quotation products", () => {
+    expect(() =>
+      createProductSchema.parse({
+        ...valid,
+        purchaseMode: "quotation",
+        priceMinor: null,
+      }),
+    ).toThrow(/priceMinor/);
+  });
+
+  it("rejects an option group with no values", () => {
+    const result = createProductSchema.safeParse({
+      ...valid,
+      optionGroups: [{
+        name: "Talla",
+        required: true,
+        sortOrder: 0,
+        values: [],
+      }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a negative surcharge", () => {
+    const result = createProductSchema.safeParse({
+      ...valid,
+      optionGroups: [{
+        name: "Talla",
+        required: true,
+        sortOrder: 0,
+        values: [{ label: "M", priceDeltaMinor: -1, sortOrder: 0 }],
+      }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts priced groups", () => {
     expect(
-      createProductSchema.parse({ ...valid, purchaseMode: "quotation", priceMinor: null }).priceMinor,
-    ).toBeNull();
+      createProductSchema.parse({
+        ...valid,
+        optionGroups: [{
+          name: "Talla",
+          required: true,
+          sortOrder: 0,
+          values: [{ label: "M", priceDeltaMinor: 0, sortOrder: 0 }],
+        }],
+      }).optionGroups,
+    ).toHaveLength(1);
   });
 });

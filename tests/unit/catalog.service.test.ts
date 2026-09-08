@@ -9,10 +9,11 @@ const product = {
   slug: "maquina-hielo-500-kg",
   categoryId,
   purchaseMode: "quotation",
-  priceMinor: null,
+  priceMinor: 28_990_000,
   summary: "Producción industrial para comercios.",
   description: "",
   published: false,
+  optionGroups: [],
 };
 
 const createRepository = (overrides: Partial<CatalogRepository> = {}) => ({

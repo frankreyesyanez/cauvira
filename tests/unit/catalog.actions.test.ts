@@ -94,6 +94,7 @@ describe("catalog actions", () => {
         summary: "Equipo industrial listo para cotizar.",
         description: "Descripción detallada.",
         published: false,
+        optionGroups: [],
       },
       attributes: {
         daily_output: { value: 500, unit: "kg/día" },
@@ -197,6 +198,7 @@ describe("catalog actions", () => {
     productForm.set("slug", "maquina-de-hielo-industrial");
     productForm.set("categoryId", categoryId);
     productForm.set("purchaseMode", "quotation");
+    productForm.set("price", "289900");
     productForm.set("summary", "Equipo industrial listo para cotizar.");
     productForm.set("attribute.daily_output", "500");
 
