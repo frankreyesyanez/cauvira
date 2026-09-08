@@ -45,6 +45,7 @@ const createRepository = (overrides: Partial<CatalogRepository> = {}) => ({
   }),
   listPublishedProducts: vi.fn(),
   getPublishedProductBySlug: vi.fn(),
+  getPublishedProductById: vi.fn(),
   ...overrides,
 }) as unknown as CatalogRepository;
 

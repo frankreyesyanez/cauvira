@@ -116,6 +116,7 @@ export interface CatalogRepository {
     categorySlug?: string;
   }): Promise<PublishedProductSummary[]>;
   getPublishedProductBySlug(slug: string): Promise<PublishedProductDetail | null>;
+  getPublishedProductById(id: string): Promise<PublishedProductDetail | null>;
 }
 
 type Database = ReturnType<typeof createDatabase>;
@@ -336,6 +337,55 @@ async function loadProductIdsWithOptions(
     .where(inArray(productOptionGroups.productId, productIds));
 
   return new Set(rows.map((row) => row.productId));
+}
+
+async function loadPublishedProductDetail(
+  reader: CatalogReader,
+  where: ReturnType<typeof and>,
+): Promise<PublishedProductDetail | null> {
+  const [product] = await reader
+    .select({
+      id: products.id,
+      title: products.title,
+      slug: products.slug,
+      summary: products.summary,
+      description: products.description,
+      purchaseMode: products.purchaseMode,
+      priceMinor: products.priceMinor,
+    })
+    .from(products)
+    .where(where)
+    .limit(1);
+
+  if (!product) {
+    return null;
+  }
+
+  const attributes = await reader
+    .select({
+      label: categoryAttributes.label,
+      value: productAttributeValues.value,
+      unit: categoryAttributes.unit,
+    })
+    .from(productAttributeValues)
+    .innerJoin(
+      categoryAttributes,
+      eq(productAttributeValues.attributeId, categoryAttributes.id),
+    )
+    .where(eq(productAttributeValues.productId, product.id));
+
+  const [optionGroups, images] = await Promise.all([
+    loadOptionGroups(reader, product.id),
+    loadProductImages(reader, product.id),
+  ]);
+
+  return {
+    ...product,
+    attributes,
+    optionGroups,
+    images,
+    hasOptions: optionGroups.length > 0,
+  };
 }
 
 export class DrizzleCatalogRepository implements CatalogRepository {
@@ -862,51 +912,17 @@ export class DrizzleCatalogRepository implements CatalogRepository {
     }));
   }
 
-  async getPublishedProductBySlug(
-    slug: string,
-  ): Promise<PublishedProductDetail | null> {
-    const [product] = await this.database
-      .select({
-        id: products.id,
-        title: products.title,
-        slug: products.slug,
-        summary: products.summary,
-        description: products.description,
-        purchaseMode: products.purchaseMode,
-        priceMinor: products.priceMinor,
-      })
-      .from(products)
-      .where(and(eq(products.slug, slug), eq(products.published, true)))
-      .limit(1);
+  getPublishedProductBySlug(slug: string): Promise<PublishedProductDetail | null> {
+    return loadPublishedProductDetail(
+      this.database,
+      and(eq(products.slug, slug), eq(products.published, true)),
+    );
+  }
 
-    if (!product) {
-      return null;
-    }
-
-    const attributes = await this.database
-      .select({
-        label: categoryAttributes.label,
-        value: productAttributeValues.value,
-        unit: categoryAttributes.unit,
-      })
-      .from(productAttributeValues)
-      .innerJoin(
-        categoryAttributes,
-        eq(productAttributeValues.attributeId, categoryAttributes.id),
-      )
-      .where(eq(productAttributeValues.productId, product.id));
-
-    const [optionGroups, images] = await Promise.all([
-      loadOptionGroups(this.database, product.id),
-      loadProductImages(this.database, product.id),
-    ]);
-
-    return {
-      ...product,
-      attributes,
-      optionGroups,
-      images,
-      hasOptions: optionGroups.length > 0,
-    };
+  getPublishedProductById(id: string): Promise<PublishedProductDetail | null> {
+    return loadPublishedProductDetail(
+      this.database,
+      and(eq(products.id, id), eq(products.published, true)),
+    );
   }
 }

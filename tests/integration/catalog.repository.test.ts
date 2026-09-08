@@ -637,4 +637,75 @@ describe("DrizzleCatalogRepository", () => {
       }),
     ]);
   });
+
+  it("loads a published product by id and hides unpublished ones", async () => {
+    const suffix = randomUUID();
+    const category = await repository.createCategory({
+      name: "Café e insumos",
+      slug: `cafe-publicado-${suffix}`,
+      parentId: null,
+      attributes: [],
+    });
+    createdCategoryIds.push(category.id);
+
+    const published = await repository.createProduct({
+      product: {
+        title: "Café de especialidad 1 kg",
+        slug: `cafe-publicado-${suffix}`,
+        categoryId: category.id,
+        purchaseMode: "direct_purchase",
+        priceMinor: 38_900,
+        summary: "Café publicado para carrito.",
+        description: "Detalle de café.",
+        published: true,
+        optionGroups: [
+          {
+            name: "Tueste",
+            required: true,
+            sortOrder: 0,
+            values: [{ label: "Medio", priceDeltaMinor: 0, sortOrder: 0 }],
+          },
+        ],
+      },
+      attributes: {},
+    });
+    createdProductIds.push(published.id);
+
+    const bySlug = await repository.getPublishedProductBySlug(published.slug);
+    const byId = await repository.getPublishedProductById(published.id);
+
+    expect(byId).toEqual(bySlug);
+    expect(byId).toEqual(
+      expect.objectContaining({
+        id: published.id,
+        priceMinor: 38_900,
+        hasOptions: true,
+        optionGroups: [
+          expect.objectContaining({
+            name: "Tueste",
+            values: [expect.objectContaining({ label: "Medio" })],
+          }),
+        ],
+      }),
+    );
+
+    const draft = await repository.createProduct({
+      product: {
+        title: "Café en borrador",
+        slug: `cafe-borrador-${suffix}`,
+        categoryId: category.id,
+        purchaseMode: "direct_purchase",
+        priceMinor: 20_000,
+        summary: "Aún no publicado.",
+        description: "",
+        published: false,
+        optionGroups: [],
+      },
+      attributes: {},
+    });
+    createdProductIds.push(draft.id);
+
+    await expect(repository.getPublishedProductById(draft.id)).resolves.toBeNull();
+    await expect(repository.getPublishedProductById(randomUUID())).resolves.toBeNull();
+  });
 });
