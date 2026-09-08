@@ -1,9 +1,15 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import {
+  Children,
+  isValidElement,
+  type ButtonHTMLAttributes,
+  type ReactNode,
+} from "react";
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   loading?: boolean;
+  loadingLabel?: string;
   variant?: ButtonVariant;
 };
 
@@ -22,24 +28,48 @@ function Spinner() {
   );
 }
 
-function getLoadingLabel(children: ReactNode) {
-  if (typeof children !== "string") {
-    return "Guardando";
+function getTextContent(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
   }
 
-  return `Guardando ${children.replace(/^guardar\s+/i, "")}`;
+  if (
+    !isValidElement<{
+      "aria-hidden"?: boolean | "false" | "true";
+      children?: ReactNode;
+    }>(node)
+  ) {
+    return Children.toArray(node).map(getTextContent).join(" ");
+  }
+
+  if (node.props["aria-hidden"] === true || node.props["aria-hidden"] === "true") {
+    return "";
+  }
+
+  return getTextContent(node.props.children);
+}
+
+function getLoadingLabel(accessibleLabel: string) {
+  const normalizedLabel = accessibleLabel.replace(/\s+/g, " ").trim();
+
+  return `Guardando ${normalizedLabel.replace(/^guardar\s+/i, "")}`;
 }
 
 export function Button({
+  "aria-label": ariaLabel,
   children,
   className = "",
   disabled,
   loading = false,
+  loadingLabel,
   type = "button",
   variant = "primary",
   ...props
 }: ButtonProps) {
-  const label = loading ? getLoadingLabel(children) : undefined;
+  const originalLabel = ariaLabel ?? getTextContent(children);
+  const label = loading
+    ? loadingLabel || (originalLabel ? getLoadingLabel(originalLabel) : undefined)
+    : ariaLabel;
 
   return (
     <button

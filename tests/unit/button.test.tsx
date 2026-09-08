@@ -14,6 +14,46 @@ describe("Button", () => {
     expect(button).toHaveAttribute("aria-busy", "true");
   });
 
+  it("preserves text from nested elements and fragments while loading", () => {
+    render(
+      <Button loading>
+        <>
+          <span>Guardar</span> <strong>cotización</strong>
+        </>
+      </Button>,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Guardando cotización" }),
+    ).toBeDisabled();
+  });
+
+  it("uses a supplied accessible label as the loading name source", () => {
+    render(
+      <Button aria-label="Guardar cambios del producto" loading>
+        <span aria-hidden="true">+</span>
+      </Button>,
+    );
+
+    expect(
+      screen.getByRole("button", {
+        name: "Guardando cambios del producto",
+      }),
+    ).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("accepts an explicit loading label when child text cannot name the action", () => {
+    render(
+      <Button loading loadingLabel="Guardando ficha técnica">
+        <svg aria-hidden="true" />
+      </Button>,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Guardando ficha técnica" }),
+    ).toBeDisabled();
+  });
+
   it.each(["primary", "secondary", "danger", "ghost"] as const)(
     "renders the %s variant as a native button",
     (variant) => {

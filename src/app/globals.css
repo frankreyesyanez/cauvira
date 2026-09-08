@@ -2,7 +2,7 @@
 
 :root {
   --surface-cement: #635c56;
-  --surface-raised: #756d67;
+  --surface-raised: #736b65;
   --surface-subtle: #8a817a;
   --ink-aubergine: #21151f;
   --accent-acid: #d5f064;
@@ -17,6 +17,7 @@
 @theme inline {
   --color-background: var(--surface-cement);
   --color-foreground: var(--text-cream);
+  --font-display: var(--font-barlow-condensed);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -35,6 +36,13 @@ body {
   color: var(--text-cream);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
+  font-weight: 700;
 }
 
 button,
@@ -218,7 +226,7 @@ select {
   }
 
   .button__spinner {
-    animation-duration: 1.4s;
+    animation: none;
   }
 }
 
