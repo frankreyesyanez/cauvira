@@ -1,6 +1,49 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { expect, it } from "vitest";
+import type { PurchaseMode } from "@/features/catalog/catalog.contracts";
 import { HomeView } from "@/components/catalog/home-view";
+
+const publishedProducts = [
+  {
+    id: "direct",
+    title: "Purificador compacto",
+    slug: "purificador-compacto",
+    summary: "Agua lista para servir.",
+    purchaseMode: "direct_purchase",
+    priceMinor: 489_000,
+  },
+  {
+    id: "quote",
+    title: "Cancha de pádel",
+    slug: "cancha-padel",
+    summary: "Proyecto instalado.",
+    purchaseMode: "quotation",
+    priceMinor: null,
+  },
+  {
+    id: "starting",
+    title: "Máquina de hielo",
+    slug: "maquina-hielo",
+    summary: "Producción comercial.",
+    purchaseMode: "starting_price",
+    priceMinor: 4_890_000,
+  },
+  {
+    id: "assisted",
+    title: "Casa modular",
+    slug: "casa-modular",
+    summary: "Configuración a la medida.",
+    purchaseMode: "assisted_contact",
+    priceMinor: null,
+  },
+] satisfies Array<{
+  id: string;
+  title: string;
+  slug: string;
+  summary: string;
+  purchaseMode: PurchaseMode;
+  priceMinor: number | null;
+}>;
 
 it("identifies Cauvira as a commerce experience", () => {
   render(<HomeView products={[]} categories={[]} />);
@@ -10,10 +53,51 @@ it("identifies Cauvira as a commerce experience", () => {
   expect(screen.getByRole("search")).toBeVisible();
 });
 
+it("shows purchase actions and product cards in the first viewport", () => {
+  render(<HomeView products={publishedProducts} categories={[]} />);
+
+  const viewport = screen.getByTestId("store-first-viewport");
+
+  expect(
+    within(viewport).getByRole("link", { name: "Agregar al carrito" }),
+  ).toBeVisible();
+  expect(
+    within(viewport).getByRole("link", { name: "Solicitar cotización" }),
+  ).toBeVisible();
+  expect(within(viewport).getByText(/desde \$48,900/i)).toBeVisible();
+  expect(
+    within(viewport).getByRole("link", { name: "Hablar con un especialista" }),
+  ).toBeVisible();
+
+  const productCards = within(viewport).getAllByRole("article");
+  expect(productCards.length).toBeGreaterThanOrEqual(3);
+  expect(
+    within(productCards[0]!).getByRole("heading", {
+      level: 3,
+      name: "Purificador compacto",
+    }),
+  ).toBeVisible();
+  expect(
+    within(productCards[1]!).getByRole("heading", {
+      level: 3,
+      name: "Cancha de pádel",
+    }),
+  ).toBeVisible();
+  expect(
+    within(productCards[2]!).getByRole("heading", {
+      level: 3,
+      name: "Máquina de hielo",
+    }),
+  ).toBeVisible();
+});
+
 it("shows an honest empty merchandising message without products", () => {
   render(<HomeView products={[]} categories={[]} />);
+  const viewport = screen.getByTestId("store-first-viewport");
   expect(
-    screen.getByRole("heading", { name: /sin productos publicados/i }),
+    within(viewport).getByRole("heading", { name: /sin productos publicados/i }),
   ).toBeVisible();
-  expect(screen.getAllByText(/aún no hay productos publicados en el catálogo/i)).toHaveLength(2);
+  expect(
+    within(viewport).getAllByText(/aún no hay productos publicados en el catálogo/i),
+  ).toHaveLength(2);
 });
