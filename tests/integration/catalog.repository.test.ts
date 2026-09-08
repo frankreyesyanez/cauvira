@@ -708,4 +708,61 @@ describe("DrizzleCatalogRepository", () => {
     await expect(repository.getPublishedProductById(draft.id)).resolves.toBeNull();
     await expect(repository.getPublishedProductById(randomUUID())).resolves.toBeNull();
   });
+
+  it("replaces product images from a url list", async () => {
+    const suffix = randomUUID();
+    const category = await repository.createCategory({
+      name: "Cubiertas",
+      slug: `cubiertas-${suffix}`,
+      parentId: null,
+      attributes: [],
+    });
+    createdCategoryIds.push(category.id);
+
+    const product = await repository.createProduct({
+      product: {
+        title: "Cubierta de prueba",
+        slug: `cubierta-prueba-${suffix}`,
+        categoryId: category.id,
+        purchaseMode: "direct_purchase",
+        priceMinor: 10_000,
+        summary: "Producto para cubrir imágenes de catálogo.",
+        description: "",
+        published: true,
+        optionGroups: [],
+      },
+      attributes: {},
+    });
+    createdProductIds.push(product.id);
+
+    await repository.setProductImages(product.id, [
+      `/catalog/cubierta-prueba-${suffix}.jpg`,
+    ]);
+
+    await expect(repository.getAdminProductById(product.id)).resolves.toEqual(
+      expect.objectContaining({
+        images: [
+          expect.objectContaining({
+            url: `/catalog/cubierta-prueba-${suffix}.jpg`,
+            sortOrder: 0,
+          }),
+        ],
+      }),
+    );
+
+    await repository.setProductImages(product.id, [
+      `/catalog/cubierta-prueba-${suffix}-b.jpg`,
+    ]);
+
+    await expect(repository.getAdminProductById(product.id)).resolves.toEqual(
+      expect.objectContaining({
+        images: [
+          expect.objectContaining({
+            url: `/catalog/cubierta-prueba-${suffix}-b.jpg`,
+            sortOrder: 0,
+          }),
+        ],
+      }),
+    );
+  });
 });

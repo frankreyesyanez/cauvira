@@ -117,6 +117,7 @@ export interface CatalogRepository {
   }): Promise<PublishedProductSummary[]>;
   getPublishedProductBySlug(slug: string): Promise<PublishedProductDetail | null>;
   getPublishedProductById(id: string): Promise<PublishedProductDetail | null>;
+  setProductImages(productId: string, urls: string[]): Promise<void>;
 }
 
 type Database = ReturnType<typeof createDatabase>;
@@ -924,5 +925,25 @@ export class DrizzleCatalogRepository implements CatalogRepository {
       this.database,
       and(eq(products.id, id), eq(products.published, true)),
     );
+  }
+
+  async setProductImages(productId: string, urls: string[]) {
+    await this.database.transaction(async (transaction) => {
+      await transaction
+        .delete(productImages)
+        .where(eq(productImages.productId, productId));
+
+      if (urls.length === 0) {
+        return;
+      }
+
+      await transaction.insert(productImages).values(
+        urls.map((url, sortOrder) => ({
+          productId,
+          url,
+          sortOrder,
+        })),
+      );
+    });
   }
 }

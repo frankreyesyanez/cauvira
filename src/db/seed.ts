@@ -21,6 +21,48 @@ type SeedProduct = {
   attributes: Record<string, ProductAttributeValue>;
 };
 
+const iceOptionGroups: CreateProductInput["optionGroups"] = [
+  {
+    name: "Voltaje",
+    required: true,
+    sortOrder: 0,
+    values: [
+      { label: "220 V", priceDeltaMinor: 0, sortOrder: 0 },
+      { label: "440 V", priceDeltaMinor: 850_000, sortOrder: 1 },
+    ],
+  },
+  {
+    name: "Instalación",
+    required: true,
+    sortOrder: 1,
+    values: [
+      { label: "Básica", priceDeltaMinor: 0, sortOrder: 0 },
+      { label: "Completa", priceDeltaMinor: 1_250_000, sortOrder: 1 },
+    ],
+  },
+  {
+    name: "Tratamiento de agua",
+    required: true,
+    sortOrder: 2,
+    values: [
+      { label: "Sin tratamiento", priceDeltaMinor: 0, sortOrder: 0 },
+      { label: "Ósmosis", priceDeltaMinor: 1_890_000, sortOrder: 1 },
+    ],
+  },
+];
+
+const padelOptionGroups: CreateProductInput["optionGroups"] = [
+  {
+    name: "Piso",
+    required: true,
+    sortOrder: 0,
+    values: [
+      { label: "Césped sintético", priceDeltaMinor: 0, sortOrder: 0 },
+      { label: "Resina", priceDeltaMinor: 4_500_000, sortOrder: 1 },
+    ],
+  },
+];
+
 const seedCategories: SeedCategory[] = [
   {
     name: "Máquinas de hielo",
@@ -185,7 +227,7 @@ const seedProducts: SeedProduct[] = [
       description:
         "Equipo para operación diaria en cocinas centrales y hoteles. El precio publicado es un punto de partida; la instalación, el voltaje y el tratamiento de agua se confirman en sitio.",
       published: true,
-      optionGroups: [],
+      optionGroups: iceOptionGroups,
     },
     attributes: {
       daily_output: { value: 500, unit: "kg/día" },
@@ -205,7 +247,7 @@ const seedProducts: SeedProduct[] = [
       description:
         "Diseñada para turnos largos y recarga continua. Incluye ficha técnica de consumo eléctrico y recomendaciones de ventilación para cuartos de máquina.",
       published: true,
-      optionGroups: [],
+      optionGroups: iceOptionGroups,
     },
     attributes: {
       daily_output: { value: 1000, unit: "kg/día" },
@@ -219,7 +261,7 @@ const seedProducts: SeedProduct[] = [
       title: "Montacargas eléctrico",
       slug: "montacargas-electrico",
       purchaseMode: "quotation",
-      priceMinor: 285_000_00,
+      priceMinor: 28_990_000,
       summary:
         "Montacargas eléctrico de pasillo para carga en almacén, planta y centros de distribución.",
       description:
@@ -239,7 +281,7 @@ const seedProducts: SeedProduct[] = [
       title: "Apilador diésel 3 toneladas",
       slug: "montacargas-diesel-3t",
       purchaseMode: "quotation",
-      priceMinor: 320_000_00,
+      priceMinor: 31_200_000,
       summary:
         "Apilador diésel para patios, descargas y movimiento de tarimas a la intemperie.",
       description:
@@ -299,13 +341,13 @@ const seedProducts: SeedProduct[] = [
       title: "Cancha de pádel panorámica",
       slug: "cancha-de-padel-panoramica",
       purchaseMode: "assisted_contact",
-      priceMinor: 1_250_000_00,
+      priceMinor: 89_000_000,
       summary:
         "Cancha panorámica con césped sintético; un especialista confirma estructura, iluminación y obra civil.",
       description:
         "Proyecto asistido para clubes y desarrollos. La visita técnica cubre cimentación, drenaje, cristal y tiempos de instalación.",
       published: true,
-      optionGroups: [],
+      optionGroups: padelOptionGroups,
     },
     attributes: {
       surface: "Césped sintético",
@@ -319,13 +361,13 @@ const seedProducts: SeedProduct[] = [
       title: "Cancha de pádel indoor",
       slug: "cancha-de-padel-indoor",
       purchaseMode: "assisted_contact",
-      priceMinor: 980_000_00,
+      priceMinor: 76_000_000,
       summary:
         "Cancha indoor de resina para naves existentes; el alcance se define con un especialista de Cauvira.",
       description:
         "Pensada para reconversión de espacios cubiertos. Se coordina altura libre, iluminación LED y cerramiento estándar o panorámico.",
       published: true,
-      optionGroups: [],
+      optionGroups: padelOptionGroups,
     },
     attributes: {
       surface: "Resina",
@@ -382,7 +424,8 @@ export async function seedDatabase() {
   const { user, account } = await import("@/db/schema/auth");
 
   const db = createDatabase(env.DATABASE_URL);
-  const catalog = createCatalogService(new DrizzleCatalogRepository(db));
+  const catalogRepository = new DrizzleCatalogRepository(db);
+  const catalog = createCatalogService(catalogRepository);
 
   try {
     for (const seedUser of getSeedUsers()) {
@@ -434,7 +477,10 @@ export async function seedDatabase() {
       if (!categoryId) {
         throw new Error(`Missing category ${product.categorySlug}`);
       }
-      await upsertProduct(catalog, categoryId, product);
+      const saved = await upsertProduct(catalog, categoryId, product);
+      await catalogRepository.setProductImages(saved.id, [
+        `/catalog/${product.product.slug}.jpg`,
+      ]);
     }
 
     console.log(

@@ -138,4 +138,71 @@ describe("createProductSchema", () => {
       }).optionGroups,
     ).toHaveLength(1);
   });
+
+  it("parses ice-machine and padel seed option groups", () => {
+    const ice = createProductSchema.parse({
+      ...valid,
+      slug: "maquina-de-hielo-industrial-500",
+      priceMinor: 18_990_000,
+      optionGroups: [
+        {
+          name: "Voltaje",
+          required: true,
+          sortOrder: 0,
+          values: [
+            { label: "220 V", priceDeltaMinor: 0, sortOrder: 0 },
+            { label: "440 V", priceDeltaMinor: 850_000, sortOrder: 1 },
+          ],
+        },
+        {
+          name: "Instalación",
+          required: true,
+          sortOrder: 1,
+          values: [
+            { label: "Básica", priceDeltaMinor: 0, sortOrder: 0 },
+            { label: "Completa", priceDeltaMinor: 1_250_000, sortOrder: 1 },
+          ],
+        },
+        {
+          name: "Tratamiento de agua",
+          required: true,
+          sortOrder: 2,
+          values: [
+            { label: "Sin tratamiento", priceDeltaMinor: 0, sortOrder: 0 },
+            { label: "Ósmosis", priceDeltaMinor: 1_890_000, sortOrder: 1 },
+          ],
+        },
+      ],
+    });
+    const padel = createProductSchema.parse({
+      ...valid,
+      title: "Cancha de pádel panorámica",
+      slug: "cancha-de-padel-panoramica",
+      purchaseMode: "assisted_contact",
+      priceMinor: 89_000_000,
+      optionGroups: [
+        {
+          name: "Piso",
+          required: true,
+          sortOrder: 0,
+          values: [
+            { label: "Césped sintético", priceDeltaMinor: 0, sortOrder: 0 },
+            { label: "Resina", priceDeltaMinor: 4_500_000, sortOrder: 1 },
+          ],
+        },
+      ],
+    });
+    const coffee = createProductSchema.parse({
+      ...valid,
+      title: "Café de especialidad en grano 1 kg",
+      slug: "cafe-especialidad-grano-1kg",
+      purchaseMode: "direct_purchase",
+      priceMinor: 38_900,
+      optionGroups: [],
+    });
+
+    expect(ice.optionGroups).toHaveLength(3);
+    expect(padel.optionGroups[0]?.name).toBe("Piso");
+    expect(coffee.optionGroups).toEqual([]);
+  });
 });
