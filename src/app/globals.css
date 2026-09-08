@@ -1463,6 +1463,11 @@ select {
   margin-top: auto;
 }
 
+.product-card__action form,
+.product-card__action .button {
+  width: 100%;
+}
+
 .store-product-grid--viewport .product-card__visual {
   min-height: 5.5rem;
 }
@@ -1555,6 +1560,117 @@ select {
 
 .product-detail__action {
   justify-self: start;
+}
+
+.product-configure {
+  display: grid;
+  gap: 1rem;
+}
+
+.product-configure__group {
+  margin: 0;
+  border: 2px solid var(--ink-aubergine);
+  border-radius: 0.25rem;
+  padding: 0.85rem 1rem 1rem;
+  background: var(--surface-raised);
+}
+
+.product-configure__group:focus {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.product-configure__group[aria-invalid="true"] {
+  border-color: var(--accent-vermilion);
+}
+
+.product-configure__legend {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0 0.35rem;
+  color: var(--text-muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.product-configure__required,
+.product-configure__optional {
+  border: 1px solid var(--border-warm);
+  border-radius: 100vw;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+}
+
+.product-configure__required {
+  border-color: var(--accent-vermilion);
+  color: var(--text-cream);
+}
+
+.product-configure__options {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+
+.product-configure__option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid var(--border-warm);
+  border-radius: 0.25rem;
+  padding: 0.7rem 0.85rem;
+  color: var(--text-cream);
+  cursor: pointer;
+}
+
+.product-configure__option:has(input:checked) {
+  border-color: var(--accent-acid);
+  background: color-mix(in srgb, var(--accent-acid) 12%, transparent);
+}
+
+.product-configure__option-label {
+  font-weight: 700;
+}
+
+.product-configure__delta {
+  color: var(--accent-acid);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.78rem;
+}
+
+.product-configure__total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin: 0.15rem 0 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.product-configure__total-label {
+  color: var(--text-muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.product-configure__submit {
+  justify-self: start;
+}
+
+.product-configure__submit .button {
+  min-width: 12rem;
+}
+
+.product-configure__submit .button:disabled {
+  pointer-events: none;
 }
 
 .product-detail section h2 {

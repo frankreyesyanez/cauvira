@@ -22,6 +22,7 @@ export async function addToCartAction(formData: FormData) {
   if (result.ok) {
     revalidatePath("/");
     revalidatePath("/productos");
+    revalidatePath("/productos/[slug]", "page");
   }
   return result;
 }

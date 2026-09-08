@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createCatalogService } from "@/features/catalog/catalog.service";
 import { DrizzleCatalogRepository } from "@/features/catalog/catalog.repository";
 import { formatAttributeValue } from "@/components/catalog/format-attribute-value";
-import { getProductAction } from "@/components/catalog/product-detail-action";
+import { ProductConfigure } from "@/components/catalog/product-configure";
 import { ProductMedia } from "@/components/catalog/product-media";
 import { catalogImageSrc } from "@/lib/catalog-image";
 import { StoreChrome } from "@/components/catalog/store-chrome";
@@ -17,34 +16,6 @@ type ProductDetailPageProps = {
   params: Promise<{ slug: string }>;
 };
 
-function ProductPrice({
-  purchaseMode,
-  priceMinor,
-}: {
-  purchaseMode: string;
-  priceMinor: number | null;
-}) {
-  if (purchaseMode === "quotation") {
-    return <p className="product-detail__price">Precio por proyecto</p>;
-  }
-
-  if (purchaseMode === "assisted_contact") {
-    return <p className="product-detail__price">Configuración asistida</p>;
-  }
-
-  if (priceMinor === null) {
-    return <p className="product-detail__price">Precio a confirmar</p>;
-  }
-
-  const price = formatMxn(priceMinor);
-
-  if (purchaseMode === "starting_price") {
-    return <p className="product-detail__price">Desde {price}</p>;
-  }
-
-  return <p className="product-detail__price">{price}</p>;
-}
-
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const { slug } = await params;
   const catalog = createCatalogService(new DrizzleCatalogRepository(db));
@@ -57,8 +28,6 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   if (!product) {
     notFound();
   }
-
-  const action = getProductAction(product.purchaseMode);
 
   return (
     <main className="product-detail">
@@ -80,17 +49,12 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
           <p className="product-detail__eyebrow">Solución verificada</p>
           <h1>{product.title}</h1>
           <p className="product-detail__summary">{product.summary}</p>
-          <ProductPrice
+          <p className="product-detail__price">Desde {formatMxn(product.priceMinor)}</p>
+          <ProductConfigure
+            optionGroups={product.optionGroups}
             priceMinor={product.priceMinor}
-            purchaseMode={product.purchaseMode}
+            productId={product.id}
           />
-          <Link
-            className="button button--primary product-detail__action"
-            href={`#${action.anchor}`}
-            id={action.anchor}
-          >
-            {action.label}
-          </Link>
           <section aria-labelledby="product-description">
             <h2 id="product-description">Descripción</h2>
             <p>{product.description}</p>
