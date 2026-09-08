@@ -43,7 +43,18 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
       <ProductForm
         action={updateProductAction.bind(null, id)}
         categories={categories}
-        initialProduct={product}
+        initialProduct={{
+          title: product.title,
+          slug: product.slug,
+          categoryId: product.categoryId,
+          purchaseMode: product.purchaseMode,
+          priceMinor: product.priceMinor,
+          summary: product.summary,
+          description: product.description,
+          published: product.published,
+          attributes: product.attributes,
+          optionGroups: product.optionGroups,
+        }}
       />
     </main>
   );

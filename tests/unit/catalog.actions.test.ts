@@ -166,6 +166,50 @@ describe("catalog actions", () => {
     });
   });
 
+  it("forwards priced option groups from form fields to createProduct", async () => {
+    const dependencies = createDependencies();
+    const actions = createCatalogActions(dependencies);
+    const formData = new FormData();
+    formData.set("title", "Máquina de hielo industrial");
+    formData.set("slug", "maquina-de-hielo-industrial");
+    formData.set("categoryId", categoryId);
+    formData.set("purchaseMode", "starting_price");
+    formData.set("price", "125000.50");
+    formData.set("summary", "Equipo industrial listo para cotizar.");
+    formData.set("description", "Descripción detallada.");
+    formData.set("attribute.daily_output", "500");
+    formData.set("optionGroups.0.name", "Talla");
+    formData.set("optionGroups.0.required", "on");
+    formData.set("optionGroups.0.values.0.label", "M");
+    formData.set("optionGroups.0.values.0.price", "0");
+
+    await expect(actions.createProductAction(formData)).resolves.toEqual({
+      ok: true,
+      id: "product-id",
+    });
+    expect(dependencies.catalog.createProduct).toHaveBeenCalledWith({
+      product: expect.objectContaining({
+        optionGroups: [
+          {
+            name: "Talla",
+            required: true,
+            sortOrder: 0,
+            values: [
+              {
+                label: "M",
+                priceDeltaMinor: 0,
+                sortOrder: 0,
+              },
+            ],
+          },
+        ],
+      }),
+      attributes: {
+        daily_output: { value: 500, unit: "kg/día" },
+      },
+    });
+  });
+
   it("requires a price for starting-price products", async () => {
     const dependencies = createDependencies();
     const actions = createCatalogActions(dependencies);

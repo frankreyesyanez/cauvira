@@ -60,29 +60,41 @@ it("switches dynamic fields while preserving shared product fields", () => {
 });
 
 it.each([
-  ["direct_purchase", "Agregar al pedido"],
-  ["quotation", "Solicitar cotización"],
-  ["starting_price", "Ver precio desde"],
-  ["assisted_contact", "Hablar con un asesor"],
-])("previews the %s call to action", (mode, label) => {
+  "direct_purchase",
+  "quotation",
+  "starting_price",
+  "assisted_contact",
+])("previews Agregar al carrito for %s", (mode) => {
   render(<ProductForm action={vi.fn()} categories={categories} />);
 
   fireEvent.change(screen.getByLabelText(/modalidad de compra/i), {
     target: { value: mode },
   });
 
-  expect(screen.getByText(label)).toBeVisible();
+  expect(screen.getByText("Agregar al carrito")).toBeVisible();
 });
 
-it("requires public price in the starting-price UI", () => {
+it("lets staff add a purchase option group with a priced value", () => {
   render(<ProductForm action={vi.fn()} categories={categories} />);
-
-  fireEvent.change(screen.getByLabelText(/modalidad de compra/i), {
-    target: { value: "starting_price" },
+  fireEvent.click(screen.getByRole("button", { name: /agregar grupo de opciones/i }));
+  fireEvent.change(screen.getByLabelText(/nombre del grupo/i), {
+    target: { value: "Talla" },
   });
+  fireEvent.change(screen.getByLabelText(/^etiqueta$/i), {
+    target: { value: "M" },
+  });
+  fireEvent.change(screen.getByLabelText(/cargo \(mxn\)/i), {
+    target: { value: "0" },
+  });
+  expect(screen.getByLabelText(/nombre del grupo/i)).toHaveValue("Talla");
+});
 
+it("requires public price for every purchase mode", () => {
+  render(<ProductForm action={vi.fn()} categories={categories} />);
+  fireEvent.change(screen.getByLabelText(/modalidad de compra/i), {
+    target: { value: "quotation" },
+  });
   expect(screen.getByLabelText(/precio público/i)).toBeRequired();
-  expect(screen.getByText("Ver precio desde")).toBeVisible();
 });
 
 it("prefills editable product values and inherited attributes", () => {

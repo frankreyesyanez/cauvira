@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import type { AttributeType } from "@/features/catalog/catalog.contracts";
-import type { CatalogActionResult } from "@/features/catalog/catalog.actions";
+import { ProductOptionsFields } from "@/components/catalog/product-options-fields";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
+import type { CatalogActionResult } from "@/features/catalog/catalog.actions";
+import type { AttributeType } from "@/features/catalog/catalog.contracts";
+import type { CatalogOptionGroup } from "@/features/catalog/pricing";
 
 export type ProductFormCategory = {
   id: string;
@@ -33,6 +35,7 @@ type ProductFormProps = {
     description: string;
     published: boolean;
     attributes: Record<string, unknown>;
+    optionGroups?: CatalogOptionGroup[];
   };
 };
 
@@ -41,13 +44,6 @@ const purchaseModeLabels = {
   quotation: "Cotización",
   starting_price: "Precio desde",
   assisted_contact: "Contacto asistido",
-} as const;
-
-const purchaseModeCtas = {
-  direct_purchase: "Agregar al pedido",
-  quotation: "Solicitar cotización",
-  starting_price: "Ver precio desde",
-  assisted_contact: "Hablar con un asesor",
 } as const;
 
 type PurchaseMode = keyof typeof purchaseModeLabels;
@@ -374,11 +370,7 @@ export function ProductForm({
             <ControlError error={errors.purchaseMode} id="purchaseMode-error" />
           </div>
           <Field
-            description={
-              purchaseMode === "direct_purchase" || purchaseMode === "starting_price"
-                ? "Obligatorio para compra directa y precio desde."
-                : "Opcional para cotización o contacto."
-            }
+            description="Obligatorio. El cliente lo ve como precio desde."
             error={errors.priceMinor?.[0]}
             inputMode="decimal"
             label="Precio público (MXN)"
@@ -389,19 +381,21 @@ export function ProductForm({
                 ? undefined
                 : initialProduct.priceMinor / 100
             }
-            required={
-              purchaseMode === "direct_purchase" ||
-              purchaseMode === "starting_price"
-            }
+            required
             step="0.01"
             type="number"
           />
         </div>
         <div className="cta-preview" aria-live="polite">
           <span>Vista previa de acción</span>
-          <strong>{purchaseModeCtas[purchaseMode]}</strong>
+          <strong>Agregar al carrito</strong>
         </div>
       </fieldset>
+
+      <ProductOptionsFields
+        errors={errors}
+        initialGroups={initialProduct?.optionGroups}
+      />
 
       <fieldset className="admin-form__section">
         <legend>Ficha técnica · {selectedCategory?.name}</legend>
