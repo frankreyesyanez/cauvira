@@ -6,7 +6,7 @@ import { catalogImageSrc } from "@/lib/catalog-image";
 import { formatMxn } from "@/lib/money";
 
 export function ProductCard({ product }: { product: PublishedProductSummary }) {
-  const hasPhoto = Boolean(catalogImageSrc(product.slug));
+  const hasPhoto = Boolean(catalogImageSrc(product.images, product.slug));
 
   return (
     <article className="product-card">
@@ -19,7 +19,11 @@ export function ProductCard({ product }: { product: PublishedProductSummary }) {
         href={`/productos/${product.slug}`}
         aria-label={`Ver ${product.title}`}
       >
-        <ProductMedia slug={product.slug} title={product.title} />
+        <ProductMedia
+          images={product.images}
+          slug={product.slug}
+          title={product.title}
+        />
       </Link>
       <div className="product-card__body">
         <p className="product-card__eyebrow">Solución verificada</p>

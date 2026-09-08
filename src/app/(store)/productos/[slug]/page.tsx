@@ -3,7 +3,7 @@ import { createCatalogService } from "@/features/catalog/catalog.service";
 import { DrizzleCatalogRepository } from "@/features/catalog/catalog.repository";
 import { formatAttributeValue } from "@/components/catalog/format-attribute-value";
 import { ProductConfigure } from "@/components/catalog/product-configure";
-import { ProductMedia } from "@/components/catalog/product-media";
+import { ProductGallery } from "@/components/catalog/product-gallery";
 import { catalogImageSrc } from "@/lib/catalog-image";
 import { StoreChrome } from "@/components/catalog/store-chrome";
 import { getBagItemCount } from "@/features/cart/cart.mutations";
@@ -37,12 +37,16 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
           <p className="product-detail__media-label">Imagen principal</p>
           <div
             className={
-              catalogImageSrc(product.slug)
+              catalogImageSrc(product.images, product.slug)
                 ? "product-detail__media-frame product-detail__media-frame--photo"
                 : "product-detail__media-frame"
             }
           >
-            <ProductMedia slug={product.slug} title={product.title} />
+            <ProductGallery
+              images={product.images}
+              slug={product.slug}
+              title={product.title}
+            />
           </div>
         </div>
         <div className="product-detail__content">
