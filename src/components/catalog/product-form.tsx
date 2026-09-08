@@ -238,7 +238,13 @@ export function ProductForm({
   }
 
   return (
-    <form className="admin-form" onSubmit={submit}>
+    <form
+      action={
+        action as unknown as (formData: FormData) => Promise<void>
+      }
+      className="admin-form"
+      onSubmit={submit}
+    >
       {errors._form ? (
         <div className="ui-alert ui-alert--urgent" role="alert">
           <span aria-hidden="true" className="ui-icon">!</span>
