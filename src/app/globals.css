@@ -1817,6 +1817,13 @@ select {
   pointer-events: none;
 }
 
+.add-to-cart-error {
+  margin: 0.5rem 0 0;
+  color: var(--accent-vermilion);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
 .product-detail section h2 {
   margin: 0 0 0.75rem;
   font-size: 1.2rem;

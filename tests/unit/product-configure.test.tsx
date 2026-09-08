@@ -1,11 +1,25 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, expect, it, vi } from "vitest";
 import { ProductConfigure } from "@/components/catalog/product-configure";
+import { addToCartAction } from "@/features/cart/cart.mutations";
 import type { CatalogOptionGroup } from "@/features/catalog/pricing";
+
+const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh }),
+}));
 
 vi.mock("@/features/cart/cart.mutations", () => ({
   addToCartAction: vi.fn(),
 }));
+
+const addToCart = vi.mocked(addToCartAction);
+
+beforeEach(() => {
+  refresh.mockReset();
+  addToCart.mockReset();
+});
 
 const optionGroups: CatalogOptionGroup[] = [
   {
@@ -110,4 +124,55 @@ it("submits only productId when the product has no option groups", () => {
   expect(screen.getByRole("button", { name: "Agregar al carrito" })).toBeEnabled();
   expect(document.querySelector('input[name="productId"]')).toHaveValue("ice-1");
   expect(document.querySelectorAll('input[name="choiceId"]')).toHaveLength(0);
+});
+
+it("shows a Spanish error when add fails", async () => {
+  addToCart.mockResolvedValue({ ok: false, error: "product_unavailable" });
+  renderConfigure();
+
+  fireEvent.click(screen.getByRole("radio", { name: /440 v/i }));
+  fireEvent.click(screen.getByRole("radio", { name: /completa/i }));
+  fireEvent.click(screen.getByRole("button", { name: "Agregar al carrito" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("Este producto no está disponible.");
+  expect(refresh).not.toHaveBeenCalled();
+});
+
+it("refreshes after a successful add", async () => {
+  addToCart.mockResolvedValue({ ok: true, itemCount: 1 });
+  renderConfigure();
+
+  fireEvent.click(screen.getByRole("radio", { name: /440 v/i }));
+  fireEvent.click(screen.getByRole("radio", { name: /completa/i }));
+  fireEvent.click(screen.getByRole("button", { name: "Agregar al carrito" }));
+
+  await waitFor(() => {
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+it("disables submit while add is in flight", async () => {
+  let resolveAdd!: (value: { ok: true; itemCount: number }) => void;
+  addToCart.mockReturnValue(
+    new Promise((resolve) => {
+      resolveAdd = resolve;
+    }),
+  );
+  renderConfigure();
+
+  fireEvent.click(screen.getByRole("radio", { name: /440 v/i }));
+  fireEvent.click(screen.getByRole("radio", { name: /completa/i }));
+  fireEvent.click(screen.getByRole("button", { name: "Agregar al carrito" }));
+
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Agregar al carrito" })).toBeDisabled();
+  });
+
+  resolveAdd({ ok: true, itemCount: 1 });
+
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Agregar al carrito" })).toBeEnabled();
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
 });

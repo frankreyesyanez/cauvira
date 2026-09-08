@@ -1,21 +1,23 @@
-import { addToCartAction } from "@/features/cart/cart.mutations";
+"use client";
+
+import { AddToCartSubmitButton, useAddToCart } from "@/components/catalog/use-add-to-cart";
 
 type AddToCartButtonProps = {
   productId: string;
 };
 
 export function AddToCartButton({ productId }: AddToCartButtonProps) {
-  async function submit(formData: FormData) {
-    "use server";
-    await addToCartAction(formData);
-  }
+  const { error, submitAddToCart } = useAddToCart();
 
   return (
-    <form action={submit}>
+    <form action={submitAddToCart}>
       <input name="productId" type="hidden" value={productId} />
-      <button className="button button--primary" type="submit">
-        Agregar al carrito
-      </button>
+      <AddToCartSubmitButton />
+      {error ? (
+        <p className="add-to-cart-error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </form>
   );
 }

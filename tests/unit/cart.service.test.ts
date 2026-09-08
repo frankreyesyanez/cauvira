@@ -95,6 +95,7 @@ function createMemoryCartRepository(): CartRepository {
       return [...items.values()].filter((item) => item.cartId === cartId);
     },
     async findItemByFingerprint(cartId, productId, choiceFingerprint) {
+      await Promise.resolve();
       return (
         [...items.values()].find(
           (item) =>
@@ -108,9 +109,59 @@ function createMemoryCartRepository(): CartRepository {
       return items.get(id) ?? null;
     },
     async insertItem(input) {
+      const duplicate = [...items.values()].find(
+        (item) =>
+          item.cartId === input.cartId &&
+          item.productId === input.productId &&
+          item.choiceFingerprint === input.choiceFingerprint,
+      );
+      if (duplicate) {
+        throw Object.assign(
+          new Error('duplicate key value violates unique constraint "cart_items_line_unique"'),
+          { code: "23505", constraint_name: "cart_items_line_unique" },
+        );
+      }
       const record: CartItemRecord = { id: randomUUID(), ...input };
       items.set(record.id, record);
       return record;
+    },
+    async upsertItem(input) {
+      const existing = await this.findItemByFingerprint(
+        input.cartId,
+        input.productId,
+        input.choiceFingerprint,
+      );
+      if (existing) {
+        const next = await this.updateItemQuantity(
+          existing.id,
+          Math.min(99, existing.quantity + input.quantity),
+        );
+        if (!next) {
+          throw new Error("Failed to merge cart item");
+        }
+        return next;
+      }
+      try {
+        return await this.insertItem(input);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+        if (code !== "23505" && !message.includes("cart_items_line_unique")) {
+          throw error;
+        }
+        const raced = await this.findItemByFingerprint(
+          input.cartId,
+          input.productId,
+          input.choiceFingerprint,
+        );
+        if (!raced) throw error;
+        const next = await this.updateItemQuantity(
+          raced.id,
+          Math.min(99, raced.quantity + input.quantity),
+        );
+        if (!next) throw error;
+        return next;
+      }
     },
     async updateItemQuantity(id, quantity) {
       const current = items.get(id);
@@ -202,6 +253,26 @@ describe("createCartService", () => {
     expect(view.items[0]?.quantity).toBe(5);
     expect(view.itemCount).toBe(5);
     expect(view.subtotalMinor).toBe(21_090_000 * 5);
+  });
+
+  it("merges concurrent first adds of the same line instead of throwing", async () => {
+    const { service, cartId } = await createService();
+    const payload = {
+      cartId,
+      productId: coffeeId,
+      choiceIds: [] as string[],
+      quantity: 2,
+    };
+
+    const [left, right] = await Promise.all([
+      service.addItem(payload),
+      service.addItem(payload),
+    ]);
+    const view = left.itemCount >= right.itemCount ? left : right;
+
+    expect(view.items).toHaveLength(1);
+    expect(view.items[0]?.quantity).toBe(4);
+    expect(view.itemCount).toBe(4);
   });
 
   it("throws CartInputError missing_required when a required choice is absent", async () => {

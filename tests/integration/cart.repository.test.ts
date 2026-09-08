@@ -115,6 +115,28 @@ describe("DrizzleCartRepository", () => {
     await expect(repository.listItems(cart.id)).resolves.toEqual([]);
   });
 
+  it("upserts the same line by incrementing quantity up to 99", async () => {
+    const product = await seedProduct();
+    const cart = await repository.createCart();
+    createdCartIds.push(cart.id);
+    const payload = {
+      cartId: cart.id,
+      productId: product.id,
+      quantity: 90,
+      choiceIds: [] as string[],
+      choiceFingerprint: fingerprintChoiceIds([]),
+    };
+
+    const first = await repository.upsertItem(payload);
+    const second = await repository.upsertItem({ ...payload, quantity: 20 });
+
+    expect(second.id).toBe(first.id);
+    expect(second.quantity).toBe(99);
+    await expect(repository.listItems(cart.id)).resolves.toEqual([
+      expect.objectContaining({ id: first.id, quantity: 99 }),
+    ]);
+  });
+
   it("rejects a second line with the same cart, product, and fingerprint", async () => {
     const product = await seedProduct();
     const cart = await repository.createCart();

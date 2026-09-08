@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { addToCartAction } from "@/features/cart/cart.mutations";
+import { AddToCartSubmitButton, useAddToCart } from "@/components/catalog/use-add-to-cart";
 import type { CatalogOptionGroup } from "@/features/catalog/pricing";
 import { formatMxn } from "@/lib/money";
 
@@ -34,6 +34,7 @@ export function ProductConfigure({
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [invalidGroupId, setInvalidGroupId] = useState<string | null>(null);
   const groupRefs = useRef<Record<string, HTMLFieldSetElement | null>>({});
+  const { error, submitAddToCart } = useAddToCart();
 
   const canSubmit = optionGroups.every(
     (group) => !group.required || Boolean(selected[group.id]),
@@ -58,12 +59,7 @@ export function ProductConfigure({
   }
 
   return (
-    <form
-      action={async (formData) => {
-        await addToCartAction(formData);
-      }}
-      className="product-configure"
-    >
+    <form action={submitAddToCart} className="product-configure">
       <input name="productId" type="hidden" value={productId} />
       {choiceIds.map((choiceId) => (
         <input key={choiceId} name="choiceId" type="hidden" value={choiceId} />
@@ -132,18 +128,12 @@ export function ProductConfigure({
           if (!canSubmit) markFirstIncomplete();
         }}
       >
-        <button
-          className="button button--primary"
-          disabled={!canSubmit}
-          onClick={(event) => {
-            if (canSubmit) return;
-            event.preventDefault();
-            markFirstIncomplete();
-          }}
-          type="submit"
-        >
-          Agregar al carrito
-        </button>
+        <AddToCartSubmitButton disabled={!canSubmit} />
+        {error ? (
+          <p className="add-to-cart-error" role="alert">
+            {error}
+          </p>
+        ) : null}
       </div>
     </form>
   );

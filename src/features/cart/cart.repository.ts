@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { createDatabase } from "@/db/create-database";
 import { cartItems, carts } from "@/db/schema/cart";
 
@@ -22,6 +22,13 @@ export interface CartRepository {
   ): Promise<CartItemRecord | null>;
   getItem(id: string): Promise<CartItemRecord | null>;
   insertItem(input: {
+    cartId: string;
+    productId: string;
+    quantity: number;
+    choiceIds: string[];
+    choiceFingerprint: string;
+  }): Promise<CartItemRecord>;
+  upsertItem(input: {
     cartId: string;
     productId: string;
     quantity: number;
@@ -150,6 +157,36 @@ export class DrizzleCartRepository implements CartRepository {
       });
     if (!row) {
       throw new Error("Failed to insert cart item");
+    }
+    return toRecord(row);
+  }
+
+  async upsertItem(input: {
+    cartId: string;
+    productId: string;
+    quantity: number;
+    choiceIds: string[];
+    choiceFingerprint: string;
+  }) {
+    const [row] = await this.database
+      .insert(cartItems)
+      .values(input)
+      .onConflictDoUpdate({
+        target: [cartItems.cartId, cartItems.productId, cartItems.choiceFingerprint],
+        set: {
+          quantity: sql`least(99, ${cartItems.quantity} + excluded.quantity)`,
+        },
+      })
+      .returning({
+        id: cartItems.id,
+        cartId: cartItems.cartId,
+        productId: cartItems.productId,
+        quantity: cartItems.quantity,
+        choiceIds: cartItems.choiceIds,
+        choiceFingerprint: cartItems.choiceFingerprint,
+      });
+    if (!row) {
+      throw new Error("Failed to upsert cart item");
     }
     return toRecord(row);
   }

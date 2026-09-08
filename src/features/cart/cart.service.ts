@@ -157,25 +157,13 @@ export const createCartService = (
       }
 
       const choiceFingerprint = fingerprintChoiceIds(input.choiceIds);
-      const existing = await cartRepo.findItemByFingerprint(
-        input.cartId,
-        input.productId,
+      await cartRepo.upsertItem({
+        cartId: input.cartId,
+        productId: input.productId,
+        quantity: input.quantity,
+        choiceIds: input.choiceIds,
         choiceFingerprint,
-      );
-      if (existing) {
-        await cartRepo.updateItemQuantity(
-          existing.id,
-          Math.min(99, existing.quantity + input.quantity),
-        );
-      } else {
-        await cartRepo.insertItem({
-          cartId: input.cartId,
-          productId: input.productId,
-          quantity: input.quantity,
-          choiceIds: input.choiceIds,
-          choiceFingerprint,
-        });
-      }
+      });
 
       return getCart(input.cartId);
     },

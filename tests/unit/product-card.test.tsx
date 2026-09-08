@@ -3,6 +3,10 @@ import { expect, it, vi } from "vitest";
 import { ProductCard } from "@/components/catalog/product-card";
 import type { PublishedProductSummary } from "@/features/catalog/catalog.repository";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
+
 vi.mock("@/features/cart/cart.mutations", () => ({
   addToCartAction: vi.fn(),
 }));
