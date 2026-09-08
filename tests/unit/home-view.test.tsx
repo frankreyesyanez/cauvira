@@ -9,3 +9,11 @@ it("identifies Cauvira as a commerce experience", () => {
   ).toBeVisible();
   expect(screen.getByRole("search")).toBeVisible();
 });
+
+it("shows an honest empty merchandising message without products", () => {
+  render(<HomeView products={[]} categories={[]} />);
+  expect(
+    screen.getByRole("heading", { name: /sin productos publicados/i }),
+  ).toBeVisible();
+  expect(screen.getAllByText(/aún no hay productos publicados en el catálogo/i)).toHaveLength(2);
+});
