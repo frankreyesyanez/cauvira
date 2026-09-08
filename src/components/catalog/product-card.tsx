@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { PurchaseMode } from "@/features/catalog/catalog.contracts";
 import { getProductAction } from "@/components/catalog/product-detail-action";
+import { ProductMedia } from "@/components/catalog/product-media";
+import { catalogImageSrc } from "@/lib/catalog-image";
 import { formatMxn } from "@/lib/money";
 
 type ProductCardProduct = {
@@ -18,15 +20,20 @@ export function ProductCard({ product }: { product: ProductCardProduct }) {
   const price =
     product.priceMinor === null ? null : formatMxn(product.priceMinor);
 
+  const hasPhoto = Boolean(catalogImageSrc(product.slug));
+
   return (
     <article className={`product-card product-card--${mode}`}>
       <Link
-        className="product-card__visual"
+        className={
+          hasPhoto
+            ? "product-card__visual product-card__visual--photo"
+            : "product-card__visual"
+        }
         href={`/productos/${product.slug}`}
         aria-label={`Ver ${product.title}`}
       >
-        <span>Selección Cauvira</span>
-        <strong aria-hidden="true">CV</strong>
+        <ProductMedia slug={product.slug} title={product.title} />
       </Link>
       <div className="product-card__body">
         <p className="product-card__eyebrow">Solución verificada</p>

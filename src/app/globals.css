@@ -1373,13 +1373,25 @@ select {
 
 .product-card__visual {
   display: flex;
-  min-height: 11rem;
+  min-height: 12.5rem;
   align-items: flex-end;
   justify-content: space-between;
   background: var(--ink-aubergine);
   color: var(--text-muted);
   padding: 1rem;
   text-decoration: none;
+  overflow: hidden;
+}
+
+.product-card__visual--photo {
+  padding: 0;
+}
+
+.product-card__visual img {
+  width: 100%;
+  height: 12.5rem;
+  object-fit: cover;
+  display: block;
 }
 
 .product-card__visual span {
@@ -1489,6 +1501,19 @@ select {
   background: var(--ink-aubergine);
   color: var(--text-muted);
   padding: 1.25rem;
+  overflow: hidden;
+}
+
+.product-detail__media-frame--photo {
+  padding: 0;
+}
+
+.product-detail__media-frame img {
+  width: 100%;
+  min-height: 22rem;
+  height: 22rem;
+  object-fit: cover;
+  display: block;
 }
 
 .product-detail__media-frame strong {

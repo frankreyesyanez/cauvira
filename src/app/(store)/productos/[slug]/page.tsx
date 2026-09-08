@@ -4,6 +4,8 @@ import { createCatalogService } from "@/features/catalog/catalog.service";
 import { DrizzleCatalogRepository } from "@/features/catalog/catalog.repository";
 import { formatAttributeValue } from "@/components/catalog/format-attribute-value";
 import { getProductAction } from "@/components/catalog/product-detail-action";
+import { ProductMedia } from "@/components/catalog/product-media";
+import { catalogImageSrc } from "@/lib/catalog-image";
 import { StoreChrome } from "@/components/catalog/store-chrome";
 import { formatMxn } from "@/lib/money";
 import { db } from "@/db";
@@ -62,9 +64,14 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       <article className="product-detail__layout">
         <div className="product-detail__media">
           <p className="product-detail__media-label">Imagen principal</p>
-          <div className="product-detail__media-frame">
-            <span>Selección Cauvira</span>
-            <strong aria-hidden="true">CV</strong>
+          <div
+            className={
+              catalogImageSrc(product.slug)
+                ? "product-detail__media-frame product-detail__media-frame--photo"
+                : "product-detail__media-frame"
+            }
+          >
+            <ProductMedia slug={product.slug} title={product.title} />
           </div>
         </div>
         <div className="product-detail__content">
