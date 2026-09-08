@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import nextEnv from "@next/env";
 import { and, eq } from "drizzle-orm";
 import { hashPassword } from "better-auth/crypto";
+import { assertSeedAllowed } from "./assert-seed-allowed";
 import { getSeedUsers } from "./seed-credentials";
 import type { CreateCategoryInput, CreateProductInput } from "@/features/catalog/catalog.validation";
 import type { ProductAttributeValue } from "@/features/catalog/catalog.repository";
@@ -355,6 +356,13 @@ async function upsertProduct(
 }
 
 export async function seedDatabase() {
+  assertSeedAllowed({
+    allowSeed: process.env.ALLOW_SEED,
+    databaseUrl: process.env.DATABASE_URL ?? "",
+    testDatabaseUrl: process.env.TEST_DATABASE_URL ?? "",
+    seedEnv: process.env,
+  });
+
   const { env } = await import("@/lib/env");
   const { createDatabase } = await import("@/db/create-database");
   const { DrizzleCatalogRepository } = await import(

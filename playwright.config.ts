@@ -15,6 +15,7 @@ const webServerEnv = Object.fromEntries(
   Object.entries({
     ...process.env,
     DATABASE_URL: testDatabaseUrl,
+    ALLOW_SEED: "true",
     BETTER_AUTH_URL: e2eOrigin,
     NEXT_DIST_DIR: ".next-e2e",
     PORT: "3100",
