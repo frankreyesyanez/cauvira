@@ -1,7 +1,6 @@
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { forbidden } from "next/navigation";
 import { z } from "zod";
+import { catalogMutationRoles } from "./catalog.authorization";
 import type { CategoryAttributeRecord } from "./catalog.repository";
 import {
   createCategorySchema,
@@ -9,7 +8,7 @@ import {
   type CreateCategoryInput,
 } from "./catalog.validation";
 
-export const catalogMutationRoles = ["administrator", "catalog_manager"] as const;
+export { catalogMutationRoles } from "./catalog.authorization";
 
 export type CatalogActionResult =
   | { ok: true; id: string }
@@ -17,7 +16,12 @@ export type CatalogActionResult =
 
 type CatalogActionService = {
   createCategory(input: unknown): Promise<{ id: string }>;
+  updateCategory(id: string, input: unknown): Promise<{ id: string }>;
   createProduct(input: {
+    product: unknown;
+    attributes: Record<string, unknown>;
+  }): Promise<{ id: string }>;
+  updateProduct(id: string, input: {
     product: unknown;
     attributes: Record<string, unknown>;
   }): Promise<{ id: string }>;
@@ -37,6 +41,8 @@ const messageByField: Record<string, string> = {
   categoryId: "Selecciona una categoría.",
   title: "Escribe un nombre de al menos 3 caracteres.",
   summary: "Escribe un resumen de al menos 10 caracteres.",
+  description: "La descripción excede la longitud permitida.",
+  purchaseMode: "Selecciona una modalidad de compra válida.",
   priceMinor: "Ingresa un precio válido mayor a cero.",
 };
 
@@ -160,89 +166,139 @@ function dynamicAttributesFromFormData(
 }
 
 export function createCatalogActions(dependencies: CatalogActionDependencies) {
-  return {
-    async createCategoryAction(formData: FormData): Promise<CatalogActionResult> {
-      await dependencies.authorize(catalogMutationRoles);
-      const parsed = createCategorySchema.safeParse(
-        categoryInputFromFormData(formData),
-      );
-
-      if (!parsed.success) {
-        return { ok: false, fieldErrors: zodFieldErrors(parsed.error) };
-      }
-
-      try {
-        const result = await dependencies.catalog.createCategory(parsed.data);
-        return { ok: true, id: result.id };
-      } catch {
+  async function saveCategory(
+    formData: FormData,
+    persist: (input: CreateCategoryInput) => Promise<{ id: string }>,
+  ): Promise<CatalogActionResult> {
+    const parsed = createCategorySchema.safeParse(
+      categoryInputFromFormData(formData),
+    );
+    if (!parsed.success) {
+      return { ok: false, fieldErrors: zodFieldErrors(parsed.error) };
+    }
+    try {
+      const result = await persist(parsed.data);
+      return { ok: true, id: result.id };
+    } catch (error) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "field" in error &&
+        typeof error.field === "string"
+      ) {
         return {
           ok: false,
           fieldErrors: {
-            _form: ["No fue posible guardar la categoría. Revisa que el slug sea único."],
-          },
-        };
-      }
-    },
-
-    async createProductAction(formData: FormData): Promise<CatalogActionResult> {
-      await dependencies.authorize(catalogMutationRoles);
-      const product = {
-        title: formData.get("title"),
-        slug: formData.get("slug"),
-        categoryId: formData.get("categoryId"),
-        purchaseMode: formData.get("purchaseMode"),
-        priceMinor: parsePriceMinor(formData.get("price")),
-        summary: formData.get("summary"),
-        description: formData.get("description") ?? "",
-        published: formData.has("published"),
-      };
-      const parsed = createProductSchema.safeParse(product);
-
-      if (!parsed.success) {
-        return { ok: false, fieldErrors: zodFieldErrors(parsed.error) };
-      }
-
-      const category = await dependencies.catalog.getCategoryWithAttributes(
-        parsed.data.categoryId,
-      );
-      if (!category) {
-        return {
-          ok: false,
-          fieldErrors: { categoryId: ["La categoría seleccionada ya no existe."] },
-        };
-      }
-
-      const dynamic = dynamicAttributesFromFormData(formData, category.attributes);
-      if (Object.keys(dynamic.fieldErrors).length > 0) {
-        return { ok: false, fieldErrors: dynamic.fieldErrors };
-      }
-
-      try {
-        const result = await dependencies.catalog.createProduct({
-          product: parsed.data,
-          attributes: dynamic.values,
-        });
-        return { ok: true, id: result.id };
-      } catch (error) {
-        return {
-          ok: false,
-          fieldErrors: {
-            _form: [
-              error instanceof Error && /attribute/i.test(error.message)
-                ? "Revisa los atributos técnicos del producto."
-                : "No fue posible guardar el producto. Revisa que el slug sea único.",
+            [error.field]: [
+              error instanceof Error ? error.message : "El valor no es válido.",
             ],
           },
         };
       }
+      return {
+        ok: false,
+        fieldErrors: {
+          _form: ["No fue posible guardar la categoría. Revisa que el slug sea único."],
+        },
+      };
+    }
+  }
+
+  async function saveProduct(
+    formData: FormData,
+    persist: (input: {
+      product: unknown;
+      attributes: Record<string, unknown>;
+    }) => Promise<{ id: string }>,
+  ): Promise<CatalogActionResult> {
+    const product = {
+      title: formData.get("title"),
+      slug: formData.get("slug"),
+      categoryId: formData.get("categoryId"),
+      purchaseMode: formData.get("purchaseMode"),
+      priceMinor: parsePriceMinor(formData.get("price")),
+      summary: formData.get("summary"),
+      description: formData.get("description") ?? "",
+      published: formData.has("published"),
+    };
+    const parsed = createProductSchema.safeParse(product);
+    if (!parsed.success) {
+      return { ok: false, fieldErrors: zodFieldErrors(parsed.error) };
+    }
+    const category = await dependencies.catalog.getCategoryWithAttributes(
+      parsed.data.categoryId,
+    );
+    if (!category) {
+      return {
+        ok: false,
+        fieldErrors: { categoryId: ["La categoría seleccionada ya no existe."] },
+      };
+    }
+    const dynamic = dynamicAttributesFromFormData(formData, category.attributes);
+    if (Object.keys(dynamic.fieldErrors).length > 0) {
+      return { ok: false, fieldErrors: dynamic.fieldErrors };
+    }
+    try {
+      const result = await persist({
+        product: parsed.data,
+        attributes: dynamic.values,
+      });
+      return { ok: true, id: result.id };
+    } catch (error) {
+      return {
+        ok: false,
+        fieldErrors: {
+          _form: [
+            error instanceof Error && /attribute/i.test(error.message)
+              ? "Revisa los atributos técnicos del producto."
+              : "No fue posible guardar el producto. Revisa que el slug sea único.",
+          ],
+        },
+      };
+    }
+  }
+
+  return {
+    async createCategoryAction(formData: FormData): Promise<CatalogActionResult> {
+      await dependencies.authorize(catalogMutationRoles);
+      return saveCategory(formData, (input) =>
+        dependencies.catalog.createCategory(input),
+      );
+    },
+
+    async updateCategoryAction(
+      id: string,
+      formData: FormData,
+    ): Promise<CatalogActionResult> {
+      await dependencies.authorize(catalogMutationRoles);
+      return saveCategory(formData, (input) =>
+        dependencies.catalog.updateCategory(id, input),
+      );
+    },
+
+    async createProductAction(formData: FormData): Promise<CatalogActionResult> {
+      await dependencies.authorize(catalogMutationRoles);
+      return saveProduct(formData, (input) =>
+        dependencies.catalog.createProduct(input),
+      );
+    },
+
+    async updateProductAction(
+      id: string,
+      formData: FormData,
+    ): Promise<CatalogActionResult> {
+      await dependencies.authorize(catalogMutationRoles);
+      return saveProduct(formData, (input) =>
+        dependencies.catalog.updateProduct(id, input),
+      );
     },
   };
 }
 
 async function productionDependencies(): Promise<CatalogActionDependencies> {
-  const [{ requireRole }, { db }, { DrizzleCatalogRepository }, { createCatalogService }] =
+  const [{ requireCatalogMutationAccess }, { db }, { DrizzleCatalogRepository }, { createCatalogService }] =
     await Promise.all([
-      import("@/features/auth/require-role"),
+      import("./catalog.authorization"),
       import("@/db"),
       import("./catalog.repository"),
       import("./catalog.service"),
@@ -250,7 +306,7 @@ async function productionDependencies(): Promise<CatalogActionDependencies> {
   const catalog = createCatalogService(new DrizzleCatalogRepository(db));
 
   return {
-    authorize: (roles) => headers().then((requestHeaders) => requireRole(requestHeaders, roles)),
+    authorize: () => requireCatalogMutationAccess(),
     catalog,
   };
 }
@@ -259,42 +315,40 @@ export async function createCategoryAction(
   formData: FormData,
 ): Promise<CatalogActionResult> {
   "use server";
-  try {
-    const actions = createCatalogActions(await productionDependencies());
-    const result = await actions.createCategoryAction(formData);
-    if (result.ok) revalidatePath("/backoffice/categorias");
-    return result;
-  } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "status" in error &&
-      error.status === 403
-    ) {
-      forbidden();
-    }
-    throw error;
-  }
+  const actions = createCatalogActions(await productionDependencies());
+  const result = await actions.createCategoryAction(formData);
+  if (result.ok) revalidatePath("/backoffice/categorias");
+  return result;
 }
 
 export async function createProductAction(
   formData: FormData,
 ): Promise<CatalogActionResult> {
   "use server";
-  try {
-    const actions = createCatalogActions(await productionDependencies());
-    const result = await actions.createProductAction(formData);
-    if (result.ok) revalidatePath("/backoffice/catalogo");
-    return result;
-  } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "status" in error &&
-      error.status === 403
-    ) {
-      forbidden();
-    }
-    throw error;
-  }
+  const actions = createCatalogActions(await productionDependencies());
+  const result = await actions.createProductAction(formData);
+  if (result.ok) revalidatePath("/backoffice/catalogo");
+  return result;
+}
+
+export async function updateCategoryAction(
+  id: string,
+  formData: FormData,
+): Promise<CatalogActionResult> {
+  "use server";
+  const actions = createCatalogActions(await productionDependencies());
+  const result = await actions.updateCategoryAction(id, formData);
+  if (result.ok) revalidatePath("/backoffice/categorias");
+  return result;
+}
+
+export async function updateProductAction(
+  id: string,
+  formData: FormData,
+): Promise<CatalogActionResult> {
+  "use server";
+  const actions = createCatalogActions(await productionDependencies());
+  const result = await actions.updateProductAction(id, formData);
+  if (result.ok) revalidatePath("/backoffice/catalogo");
+  return result;
 }

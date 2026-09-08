@@ -8,6 +8,16 @@ import { createCategorySchema, createProductSchema } from "./catalog.validation"
 
 const isoDateSchema = z.iso.date();
 
+export class CatalogInputError extends Error {
+  constructor(
+    readonly field: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "CatalogInputError";
+  }
+}
+
 const invalidAttributeValue = (key: string): never => {
   throw new Error(`Invalid value for attribute ${key}`);
 };
@@ -69,9 +79,71 @@ const validateAttributeValue = (
   }
 };
 
+async function assertValidParent(
+  repository: CatalogRepository,
+  parentId: string | null,
+  categoryId?: string,
+) {
+  if (!parentId) return;
+  if (parentId === categoryId) {
+    throw new CatalogInputError("parentId", "Una categoría no puede ser su propia superior.");
+  }
+  const categories = await repository.listCategories();
+  const byId = new Map(categories.map((category) => [category.id, category]));
+  if (!byId.has(parentId)) {
+    throw new CatalogInputError("parentId", "La categoría superior no existe.");
+  }
+  let current = byId.get(parentId);
+  while (current) {
+    if (current.id === categoryId) {
+      throw new CatalogInputError("parentId", "La categoría superior produciría un ciclo.");
+    }
+    current = current.parentId ? byId.get(current.parentId) : undefined;
+  }
+}
+
+async function validateProductInput(
+  repository: CatalogRepository,
+  input: { product: unknown; attributes: Record<string, unknown> },
+) {
+  const product = createProductSchema.parse(input.product);
+  const category = await repository.getCategoryWithAttributes(product.categoryId);
+
+  if (!category) {
+    throw new CatalogInputError("categoryId", "Category not found");
+  }
+
+  const attributesByKey = new Map(
+    category.attributes.map((attribute) => [attribute.key, attribute]),
+  );
+  const attributes: Record<string, ProductAttributeValue> = {};
+  for (const [key, value] of Object.entries(input.attributes)) {
+    const attribute = attributesByKey.get(key);
+    if (!attribute) {
+      throw new Error(`Attribute ${key} does not belong to the category`);
+    }
+    attributes[key] = validateAttributeValue(attribute, value);
+  }
+
+  for (const attribute of category.attributes) {
+    if (attribute.required && input.attributes[attribute.key] == null) {
+      throw new Error(`Required attribute missing: ${attribute.key}`);
+    }
+  }
+  return { product, attributes };
+}
+
 export const createCatalogService = (repository: CatalogRepository) => ({
   async createCategory(input: unknown) {
-    return repository.createCategory(createCategorySchema.parse(input));
+    const category = createCategorySchema.parse(input);
+    await assertValidParent(repository, category.parentId);
+    return repository.createCategory(category);
+  },
+
+  async updateCategory(id: string, input: unknown) {
+    const category = createCategorySchema.parse(input);
+    await assertValidParent(repository, category.parentId, id);
+    return repository.updateCategory(id, category);
   },
 
   getCategoryWithAttributes(id: string) {
@@ -90,36 +162,28 @@ export const createCatalogService = (repository: CatalogRepository) => ({
     return repository.listAdminProducts(input);
   },
 
+  getAdminProductById(id: string) {
+    return repository.getAdminProductById(id);
+  },
+
   async createProduct(input: {
     product: unknown;
     attributes: Record<string, unknown>;
   }) {
-    const product = createProductSchema.parse(input.product);
-    const category = await repository.getCategoryWithAttributes(product.categoryId);
+    return repository.createProduct(await validateProductInput(repository, input));
+  },
 
-    if (!category) {
-      throw new Error("Category not found");
-    }
-
-    const attributesByKey = new Map(
-      category.attributes.map((attribute) => [attribute.key, attribute]),
+  async updateProduct(
+    id: string,
+    input: {
+      product: unknown;
+      attributes: Record<string, unknown>;
+    },
+  ) {
+    return repository.updateProduct(
+      id,
+      await validateProductInput(repository, input),
     );
-    const attributes: Record<string, ProductAttributeValue> = {};
-    for (const [key, value] of Object.entries(input.attributes)) {
-      const attribute = attributesByKey.get(key);
-      if (!attribute) {
-        throw new Error(`Attribute ${key} does not belong to the category`);
-      }
-      attributes[key] = validateAttributeValue(attribute, value);
-    }
-
-    for (const attribute of category.attributes) {
-      if (attribute.required && input.attributes[attribute.key] == null) {
-        throw new Error(`Required attribute missing: ${attribute.key}`);
-      }
-    }
-
-    return repository.createProduct({ product, attributes });
   },
 
   listPublishedProducts(input: { query?: string; categorySlug?: string }) {

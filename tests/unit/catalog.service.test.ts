@@ -34,6 +34,14 @@ const createRepository = (overrides: Partial<CatalogRepository> = {}) => ({
     id: "f6016d3e-c6a1-4db6-98e1-42f026bc0ca0",
     slug: product.slug,
   }),
+  listCategories: vi.fn().mockResolvedValue([]),
+  listAdminProducts: vi.fn(),
+  getAdminProductById: vi.fn(),
+  updateCategory: vi.fn().mockResolvedValue({ id: categoryId, slug: "updated" }),
+  updateProduct: vi.fn().mockResolvedValue({
+    id: "f6016d3e-c6a1-4db6-98e1-42f026bc0ca0",
+    slug: product.slug,
+  }),
   listPublishedProducts: vi.fn(),
   getPublishedProductBySlug: vi.fn(),
   ...overrides,
@@ -97,6 +105,62 @@ describe("createCatalogService", () => {
       }),
     ).rejects.toThrow();
     expect(repository.createCategory).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown category parent before persistence", async () => {
+    const repository = createRepository({
+      listCategories: vi.fn().mockResolvedValue([]),
+    });
+    const service = createCatalogService(repository);
+
+    await expect(
+      service.createCategory({
+        name: "Hielo",
+        slug: "hielo",
+        parentId: categoryId,
+        attributes: [],
+      }),
+    ).rejects.toMatchObject({ field: "parentId" });
+    expect(repository.createCategory).not.toHaveBeenCalled();
+  });
+
+  it("rejects self-parenting and descendant cycles when editing", async () => {
+    const rootId = "443189b7-bfac-4c1d-a9cb-7776987262c9";
+    const childId = "5542cf5f-72d4-447a-a244-ae5ac8fe691f";
+    const repository = createRepository({
+      listCategories: vi.fn().mockResolvedValue([
+        {
+          id: rootId,
+          name: "Root",
+          slug: "root",
+          parentId: null,
+          attributes: [],
+          ownAttributes: [],
+        },
+        {
+          id: childId,
+          name: "Child",
+          slug: "child",
+          parentId: rootId,
+          attributes: [],
+          ownAttributes: [],
+        },
+      ]),
+    });
+    const service = createCatalogService(repository);
+    const input = {
+      name: "Root",
+      slug: "root",
+      attributes: [],
+    };
+
+    await expect(
+      service.updateCategory(rootId, { ...input, parentId: rootId }),
+    ).rejects.toMatchObject({ field: "parentId" });
+    await expect(
+      service.updateCategory(rootId, { ...input, parentId: childId }),
+    ).rejects.toMatchObject({ field: "parentId" });
+    expect(repository.updateCategory).not.toHaveBeenCalled();
   });
 
   it("delegates published catalog queries", async () => {

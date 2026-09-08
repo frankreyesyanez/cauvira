@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import type { AttributeType } from "@/features/catalog/catalog.contracts";
 
 export const purchaseModeEnum = pgEnum("purchase_mode", [
@@ -7,7 +7,7 @@ export const purchaseModeEnum = pgEnum("purchase_mode", [
 
 export const categories = pgTable("categories", {
   id: uuid("id").defaultRandom().primaryKey(),
-  parentId: uuid("parent_id"),
+  parentId: uuid("parent_id").references((): AnyPgColumn => categories.id),
   name: text("name").notNull(),
   slug: text("slug").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

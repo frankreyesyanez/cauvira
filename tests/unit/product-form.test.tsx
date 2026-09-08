@@ -73,3 +73,68 @@ it.each([
 
   expect(screen.getByText(label)).toBeVisible();
 });
+
+it("requires public price in the starting-price UI", () => {
+  render(<ProductForm action={vi.fn()} categories={categories} />);
+
+  fireEvent.change(screen.getByLabelText(/modalidad de compra/i), {
+    target: { value: "starting_price" },
+  });
+
+  expect(screen.getByLabelText(/precio público/i)).toBeRequired();
+  expect(screen.getByText("Ver precio desde")).toBeVisible();
+});
+
+it("prefills editable product values and inherited attributes", () => {
+  render(
+    <ProductForm
+      action={vi.fn()}
+      categories={categories}
+      initialProduct={{
+        title: "Máquina existente",
+        slug: "maquina-existente",
+        categoryId: categories[0].id,
+        purchaseMode: "starting_price",
+        priceMinor: 12500050,
+        summary: "Resumen existente del producto.",
+        description: "Descripción existente.",
+        published: true,
+        attributes: {
+          daily_output: { value: 500, unit: "kg/día" },
+        },
+      }}
+    />,
+  );
+
+  expect(screen.getByLabelText(/nombre del producto/i)).toHaveValue(
+    "Máquina existente",
+  );
+  expect(screen.getByLabelText(/precio público/i)).toHaveValue(125000.5);
+  expect(screen.getByLabelText(/producción diaria/i)).toHaveValue(500);
+  expect(screen.getByLabelText(/publicar al guardar/i)).toBeChecked();
+});
+
+it("links description and purchase-mode server errors accessibly", async () => {
+  const action = vi.fn().mockResolvedValue({
+    ok: false,
+    fieldErrors: {
+      description: ["La descripción no es válida."],
+      purchaseMode: ["Selecciona una modalidad válida."],
+    },
+  });
+  render(<ProductForm action={action} categories={categories} />);
+
+  fireEvent.submit(screen.getByRole("button", { name: /guardar producto/i }).closest("form")!);
+
+  expect(await screen.findByText("La descripción no es válida.")).toBeVisible();
+  expect(screen.getByLabelText(/descripción completa/i)).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  expect(screen.getByLabelText(/descripción completa/i)).toHaveAccessibleDescription(
+    /explica beneficios.*la descripción no es válida/i,
+  );
+  expect(screen.getByLabelText(/modalidad de compra/i)).toHaveAccessibleDescription(
+    /controla la acción.*selecciona una modalidad válida/i,
+  );
+});

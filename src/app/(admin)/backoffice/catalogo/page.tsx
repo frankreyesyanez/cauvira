@@ -166,9 +166,18 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
                   <td>{date.format(product.updatedAt)}</td>
                   <td>
                     {canManageCatalog ? (
-                      <Link className="text-action" href="/backoffice/catalogo/nuevo">
-                        Crear relacionado
-                      </Link>
+                      <>
+                        <Link className="text-action" href="/backoffice/catalogo/nuevo">
+                          Crear relacionado
+                        </Link>
+                        {" · "}
+                        <Link
+                          className="text-action"
+                          href={`/backoffice/catalogo/${product.id}/editar`}
+                        >
+                          Editar
+                        </Link>
+                      </>
                     ) : (
                       <span className="catalog-table__restricted">Solo lectura</span>
                     )}

@@ -6,7 +6,7 @@ import {
   productAttributeValues,
   products,
 } from "@/db/schema/catalog";
-import type { AttributeType } from "./catalog.contracts";
+import type { AttributeType, PurchaseMode } from "./catalog.contracts";
 import type { CreateCategoryInput, CreateProductInput } from "./catalog.validation";
 
 export type CategoryAttributeRecord = {
@@ -15,6 +15,8 @@ export type CategoryAttributeRecord = {
   label: string;
   type: AttributeType;
   required: boolean;
+  filterable: boolean;
+  comparable: boolean;
   options: string[];
   unit: string | null;
 };
@@ -25,6 +27,7 @@ export type AdminCategorySummary = {
   slug: string;
   parentId: string | null;
   attributes: CategoryAttributeRecord[];
+  ownAttributes: CategoryAttributeRecord[];
 };
 
 export type AdminProductSummary = {
@@ -33,10 +36,16 @@ export type AdminProductSummary = {
   slug: string;
   categoryId: string;
   categoryName: string;
-  purchaseMode: string;
+  purchaseMode: PurchaseMode;
   priceMinor: number | null;
   published: boolean;
   updatedAt: Date;
+};
+
+export type AdminProductDetail = AdminProductSummary & {
+  summary: string;
+  description: string;
+  attributes: Record<string, ProductAttributeValue>;
 };
 
 export type ProductAttributeValue =
@@ -73,6 +82,18 @@ export interface CatalogRepository {
     product: CreateProductInput;
     attributes: Record<string, ProductAttributeValue>;
   }): Promise<{ id: string; slug: string }>;
+  updateCategory(
+    id: string,
+    input: CreateCategoryInput,
+  ): Promise<{ id: string; slug: string }>;
+  updateProduct(
+    id: string,
+    input: {
+      product: CreateProductInput;
+      attributes: Record<string, ProductAttributeValue>;
+    },
+  ): Promise<{ id: string; slug: string }>;
+  getAdminProductById(id: string): Promise<AdminProductDetail | null>;
   listCategories(): Promise<AdminCategorySummary[]>;
   listAdminProducts(input: {
     query?: string;
@@ -87,6 +108,66 @@ export interface CatalogRepository {
 }
 
 type Database = ReturnType<typeof createDatabase>;
+
+type CategoryNode = { id: string; parentId: string | null };
+type OwnedCategoryAttribute = CategoryAttributeRecord & { categoryId: string };
+
+function buildCategoryMaps(
+  categoryRows: CategoryNode[],
+  attributeRows: OwnedCategoryAttribute[],
+) {
+  const categoriesById = new Map(categoryRows.map((category) => [category.id, category]));
+  const attributesByCategory = new Map<string, CategoryAttributeRecord[]>();
+  for (const attribute of attributeRows) {
+    const current = attributesByCategory.get(attribute.categoryId) ?? [];
+    current.push({
+      id: attribute.id,
+      key: attribute.key,
+      label: attribute.label,
+      type: attribute.type,
+      required: attribute.required,
+      filterable: attribute.filterable,
+      comparable: attribute.comparable,
+      options: attribute.options,
+      unit: attribute.unit,
+    });
+    attributesByCategory.set(attribute.categoryId, current);
+  }
+  return { categoriesById, attributesByCategory };
+}
+
+function resolveFromMaps(
+  categoryId: string,
+  categoriesById: Map<string, CategoryNode>,
+  attributesByCategory: Map<string, CategoryAttributeRecord[]>,
+) {
+  const path: string[] = [];
+  const visited = new Set<string>();
+  let current = categoriesById.get(categoryId);
+  while (current) {
+    if (visited.has(current.id)) throw new Error("Category hierarchy contains a cycle");
+    visited.add(current.id);
+    path.unshift(current.id);
+    current = current.parentId ? categoriesById.get(current.parentId) : undefined;
+  }
+
+  const effective = new Map<string, CategoryAttributeRecord>();
+  for (const id of path) {
+    for (const attribute of attributesByCategory.get(id) ?? []) {
+      effective.set(attribute.key, attribute);
+    }
+  }
+  return [...effective.values()];
+}
+
+export function resolveCategoryAttributes(
+  categoryId: string,
+  categoryRows: CategoryNode[],
+  attributeRows: OwnedCategoryAttribute[],
+) {
+  const maps = buildCategoryMaps(categoryRows, attributeRows);
+  return resolveFromMaps(categoryId, maps.categoriesById, maps.attributesByCategory);
+}
 
 export class DrizzleCatalogRepository implements CatalogRepository {
   constructor(private readonly database: Database) {}
@@ -119,31 +200,208 @@ export class DrizzleCatalogRepository implements CatalogRepository {
     });
   }
 
+  async updateCategory(id: string, input: CreateCategoryInput) {
+    return this.database.transaction(async (transaction) => {
+      const existingAttributes = await transaction
+        .select()
+        .from(categoryAttributes)
+        .where(eq(categoryAttributes.categoryId, id));
+      const categoryRows = await transaction
+        .select({ id: categories.id, parentId: categories.parentId })
+        .from(categories);
+      const currentCategory = categoryRows.find((category) => category.id === id);
+      if (!currentCategory) throw new Error("Category not found");
+      const childrenByParent = new Map<string, string[]>();
+      for (const category of categoryRows) {
+        if (!category.parentId) continue;
+        const children = childrenByParent.get(category.parentId) ?? [];
+        children.push(category.id);
+        childrenByParent.set(category.parentId, children);
+      }
+      const descendants = new Set([id]);
+      const pending = [id];
+      while (pending.length) {
+        const parentId = pending.pop()!;
+        for (const childId of childrenByParent.get(parentId) ?? []) {
+          descendants.add(childId);
+          pending.push(childId);
+        }
+      }
+      const [existingProduct] = await transaction
+        .select({ id: products.id })
+        .from(products)
+        .where(inArray(products.categoryId, [...descendants]))
+        .limit(1);
+      if (currentCategory.parentId !== input.parentId && existingProduct) {
+        throw new Error(
+          "No se puede cambiar la categoría superior mientras existan productos en esta rama.",
+        );
+      }
+      const allAttributeRows = await transaction
+        .select({
+          id: categoryAttributes.id,
+          categoryId: categoryAttributes.categoryId,
+          key: categoryAttributes.key,
+          label: categoryAttributes.label,
+          type: categoryAttributes.type,
+          required: categoryAttributes.required,
+          filterable: categoryAttributes.filterable,
+          comparable: categoryAttributes.comparable,
+          options: categoryAttributes.options,
+          unit: categoryAttributes.unit,
+        })
+        .from(categoryAttributes)
+        .orderBy(categoryAttributes.key);
+      const currentEffectiveByKey = new Map(
+        resolveCategoryAttributes(id, categoryRows, allAttributeRows).map(
+          (attribute) => [attribute.key, attribute],
+        ),
+      );
+      const referencedIds = existingAttributes.length
+        ? new Set(
+            (
+              await transaction
+                .select({ attributeId: productAttributeValues.attributeId })
+                .from(productAttributeValues)
+                .where(
+                  inArray(
+                    productAttributeValues.attributeId,
+                    existingAttributes.map((attribute) => attribute.id),
+                  ),
+                )
+            ).map(({ attributeId }) => attributeId),
+          )
+        : new Set<string>();
+      const nextByKey = new Map(input.attributes.map((attribute) => [attribute.key, attribute]));
+      if (
+        existingProduct &&
+        input.attributes.some(
+          (attribute) =>
+            attribute.required &&
+            currentEffectiveByKey.get(attribute.key)?.required !== true,
+        )
+      ) {
+        throw new Error(
+          "No se puede agregar un atributo obligatorio mientras existan productos en esta rama.",
+        );
+      }
+
+      if (input.parentId) {
+        const inheritedByKey = new Map(
+          resolveCategoryAttributes(
+            input.parentId,
+            categoryRows,
+            allAttributeRows,
+          ).map((attribute) => [attribute.key, attribute]),
+        );
+        const newOverrides = input.attributes
+          .filter(
+            (attribute) =>
+              !existingAttributes.some((existing) => existing.key === attribute.key) &&
+              inheritedByKey.has(attribute.key),
+          )
+          .map((attribute) => inheritedByKey.get(attribute.key)!);
+        if (newOverrides.length) {
+          const [reference] = await transaction
+            .select({ id: productAttributeValues.id })
+            .from(productAttributeValues)
+            .where(
+              inArray(
+                productAttributeValues.attributeId,
+                newOverrides.map((attribute) => attribute.id),
+              ),
+            )
+            .limit(1);
+          if (reference) {
+            throw new Error(
+              `El atributo heredado ${newOverrides[0]!.key} está referenciado y no puede sobrescribirse.`,
+            );
+          }
+        }
+      }
+
+      for (const existing of existingAttributes) {
+        if (!referencedIds.has(existing.id)) continue;
+        const next = nextByKey.get(existing.key);
+        const incompatible =
+          !next ||
+          next.type !== existing.type ||
+          next.unit !== existing.unit ||
+          JSON.stringify(next.options) !== JSON.stringify(existing.options);
+        if (incompatible) {
+          throw new Error(
+            `El atributo ${existing.key} está referenciado y no puede eliminarse ni cambiar de tipo.`,
+          );
+        }
+      }
+
+      const [category] = await transaction
+        .update(categories)
+        .set({ name: input.name, slug: input.slug, parentId: input.parentId })
+        .where(eq(categories.id, id))
+        .returning({ id: categories.id, slug: categories.slug });
+      if (!category) throw new Error("Category not found");
+
+      const existingByKey = new Map(
+        existingAttributes.map((attribute) => [attribute.key, attribute]),
+      );
+      for (const attribute of input.attributes) {
+        const existing = existingByKey.get(attribute.key);
+        if (existing) {
+          await transaction
+            .update(categoryAttributes)
+            .set(attribute)
+            .where(eq(categoryAttributes.id, existing.id));
+        } else {
+          await transaction.insert(categoryAttributes).values({
+            categoryId: id,
+            ...attribute,
+          });
+        }
+      }
+      const removedIds = existingAttributes
+        .filter((attribute) => !nextByKey.has(attribute.key))
+        .map((attribute) => attribute.id);
+      if (removedIds.length) {
+        await transaction
+          .delete(categoryAttributes)
+          .where(inArray(categoryAttributes.id, removedIds));
+      }
+
+      return category;
+    });
+  }
+
   async getCategoryWithAttributes(id: string) {
-    const [category] = await this.database
-      .select({ id: categories.id })
-      .from(categories)
-      .where(eq(categories.id, id))
-      .limit(1);
+    const categoryRows = await this.database
+      .select({ id: categories.id, parentId: categories.parentId })
+      .from(categories);
+    const category = categoryRows.find((row) => row.id === id);
 
     if (!category) {
       return null;
     }
 
-    const attributes = await this.database
+    const attributeRows = await this.database
       .select({
         id: categoryAttributes.id,
+        categoryId: categoryAttributes.categoryId,
         key: categoryAttributes.key,
         label: categoryAttributes.label,
         type: categoryAttributes.type,
         required: categoryAttributes.required,
+        filterable: categoryAttributes.filterable,
+        comparable: categoryAttributes.comparable,
         options: categoryAttributes.options,
         unit: categoryAttributes.unit,
       })
       .from(categoryAttributes)
-      .where(eq(categoryAttributes.categoryId, category.id));
+      .orderBy(categoryAttributes.key);
 
-    return { id: category.id, attributes };
+    return {
+      id: category.id,
+      attributes: resolveCategoryAttributes(id, categoryRows, attributeRows),
+    };
   }
 
   async listCategories(): Promise<AdminCategorySummary[]> {
@@ -164,25 +422,23 @@ export class DrizzleCatalogRepository implements CatalogRepository {
         label: categoryAttributes.label,
         type: categoryAttributes.type,
         required: categoryAttributes.required,
+        filterable: categoryAttributes.filterable,
+        comparable: categoryAttributes.comparable,
         options: categoryAttributes.options,
         unit: categoryAttributes.unit,
       })
       .from(categoryAttributes)
-      .orderBy(categoryAttributes.label);
+      .orderBy(categoryAttributes.key);
+    const maps = buildCategoryMaps(categoryRows, attributeRows);
 
     return categoryRows.map((category) => ({
       ...category,
-      attributes: attributeRows
-        .filter((attribute) => attribute.categoryId === category.id)
-        .map((attribute) => ({
-          id: attribute.id,
-          key: attribute.key,
-          label: attribute.label,
-          type: attribute.type,
-          required: attribute.required,
-          options: attribute.options,
-          unit: attribute.unit,
-        })),
+      attributes: resolveFromMaps(
+        category.id,
+        maps.categoriesById,
+        maps.attributesByCategory,
+      ),
+      ownAttributes: maps.attributesByCategory.get(category.id) ?? [],
     }));
   }
 
@@ -225,6 +481,45 @@ export class DrizzleCatalogRepository implements CatalogRepository {
       .orderBy(desc(products.updatedAt));
   }
 
+  async getAdminProductById(id: string): Promise<AdminProductDetail | null> {
+    const [product] = await this.database
+      .select({
+        id: products.id,
+        title: products.title,
+        slug: products.slug,
+        categoryId: products.categoryId,
+        categoryName: categories.name,
+        purchaseMode: products.purchaseMode,
+        priceMinor: products.priceMinor,
+        published: products.published,
+        updatedAt: products.updatedAt,
+        summary: products.summary,
+        description: products.description,
+      })
+      .from(products)
+      .innerJoin(categories, eq(products.categoryId, categories.id))
+      .where(eq(products.id, id))
+      .limit(1);
+    if (!product) return null;
+
+    const values = await this.database
+      .select({
+        key: categoryAttributes.key,
+        value: productAttributeValues.value,
+      })
+      .from(productAttributeValues)
+      .innerJoin(
+        categoryAttributes,
+        eq(productAttributeValues.attributeId, categoryAttributes.id),
+      )
+      .where(eq(productAttributeValues.productId, id));
+
+    return {
+      ...product,
+      attributes: Object.fromEntries(values.map(({ key, value }) => [key, value])),
+    };
+  }
+
   async createProduct(input: {
     product: CreateProductInput;
     attributes: Record<string, ProductAttributeValue>;
@@ -241,23 +536,29 @@ export class DrizzleCatalogRepository implements CatalogRepository {
 
       const attributeEntries = Object.entries(input.attributes);
       if (attributeEntries.length > 0) {
+        const categoryRows = await transaction
+          .select({ id: categories.id, parentId: categories.parentId })
+          .from(categories);
+        const attributeRows = await transaction
+          .select({
+            id: categoryAttributes.id,
+            categoryId: categoryAttributes.categoryId,
+            key: categoryAttributes.key,
+            label: categoryAttributes.label,
+            type: categoryAttributes.type,
+            required: categoryAttributes.required,
+            filterable: categoryAttributes.filterable,
+            comparable: categoryAttributes.comparable,
+            options: categoryAttributes.options,
+            unit: categoryAttributes.unit,
+          })
+          .from(categoryAttributes)
+          .orderBy(categoryAttributes.key);
         const attributesByKey = new Map(
-          (
-            await transaction
-              .select({
-                id: categoryAttributes.id,
-                key: categoryAttributes.key,
-              })
-              .from(categoryAttributes)
-              .where(
-                and(
-                  eq(categoryAttributes.categoryId, input.product.categoryId),
-                  inArray(
-                    categoryAttributes.key,
-                    attributeEntries.map(([key]) => key),
-                  ),
-                ),
-              )
+          resolveCategoryAttributes(
+            input.product.categoryId,
+            categoryRows,
+            attributeRows,
           ).map((attribute) => [attribute.key, attribute.id]),
         );
 
@@ -273,6 +574,67 @@ export class DrizzleCatalogRepository implements CatalogRepository {
               attributeId,
               value,
             };
+          }),
+        );
+      }
+
+      return product;
+    });
+  }
+
+  async updateProduct(
+    id: string,
+    input: {
+      product: CreateProductInput;
+      attributes: Record<string, ProductAttributeValue>;
+    },
+  ) {
+    return this.database.transaction(async (transaction) => {
+      const [product] = await transaction
+        .update(products)
+        .set({ ...input.product, updatedAt: new Date() })
+        .where(eq(products.id, id))
+        .returning({ id: products.id, slug: products.slug });
+      if (!product) throw new Error("Product not found");
+
+      await transaction
+        .delete(productAttributeValues)
+        .where(eq(productAttributeValues.productId, id));
+
+      const attributeEntries = Object.entries(input.attributes);
+      if (attributeEntries.length) {
+        const categoryRows = await transaction
+          .select({ id: categories.id, parentId: categories.parentId })
+          .from(categories);
+        const attributeRows = await transaction
+          .select({
+            id: categoryAttributes.id,
+            categoryId: categoryAttributes.categoryId,
+            key: categoryAttributes.key,
+            label: categoryAttributes.label,
+            type: categoryAttributes.type,
+            required: categoryAttributes.required,
+            filterable: categoryAttributes.filterable,
+            comparable: categoryAttributes.comparable,
+            options: categoryAttributes.options,
+            unit: categoryAttributes.unit,
+          })
+          .from(categoryAttributes)
+          .orderBy(categoryAttributes.key);
+        const attributesByKey = new Map(
+          resolveCategoryAttributes(
+            input.product.categoryId,
+            categoryRows,
+            attributeRows,
+          ).map((attribute) => [attribute.key, attribute.id]),
+        );
+        await transaction.insert(productAttributeValues).values(
+          attributeEntries.map(([key, value]) => {
+            const attributeId = attributesByKey.get(key);
+            if (!attributeId) {
+              throw new Error(`Attribute ${key} does not belong to the category`);
+            }
+            return { productId: id, attributeId, value };
           }),
         );
       }

@@ -1,19 +1,15 @@
 import Link from "next/link";
 import { ProductForm } from "@/components/catalog/product-form";
-import {
-  catalogMutationRoles,
-  createProductAction,
-} from "@/features/catalog/catalog.actions";
-import { requireRole } from "@/features/auth/require-role";
+import { createProductAction } from "@/features/catalog/catalog.actions";
+import { requireCatalogMutationAccess } from "@/features/catalog/catalog.authorization";
 import { createCatalogService } from "@/features/catalog/catalog.service";
 import { DrizzleCatalogRepository } from "@/features/catalog/catalog.repository";
 import { db } from "@/db";
-import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewProductPage() {
-  await requireRole(await headers(), catalogMutationRoles);
+  await requireCatalogMutationAccess();
   const catalog = createCatalogService(new DrizzleCatalogRepository(db));
   const categories = await catalog.listCategories();
 

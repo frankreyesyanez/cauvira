@@ -1,18 +1,15 @@
 import { CategoryForm } from "@/components/catalog/category-form";
-import {
-  catalogMutationRoles,
-  createCategoryAction,
-} from "@/features/catalog/catalog.actions";
-import { requireRole } from "@/features/auth/require-role";
+import { createCategoryAction } from "@/features/catalog/catalog.actions";
+import { requireCatalogMutationAccess } from "@/features/catalog/catalog.authorization";
 import { createCatalogService } from "@/features/catalog/catalog.service";
 import { DrizzleCatalogRepository } from "@/features/catalog/catalog.repository";
 import { db } from "@/db";
-import { headers } from "next/headers";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 export default async function CategoriesPage() {
-  await requireRole(await headers(), catalogMutationRoles);
+  await requireCatalogMutationAccess();
   const catalog = createCatalogService(new DrizzleCatalogRepository(db));
   const categories = await catalog.listCategories();
 
@@ -66,6 +63,14 @@ export default async function CategoriesPage() {
                 <div>
                   <h3>{category.name}</h3>
                   <code>/{category.slug}</code>
+                  <div>
+                    <Link
+                      className="text-action"
+                      href={`/backoffice/categorias/${category.id}/editar`}
+                    >
+                      Editar
+                    </Link>
+                  </div>
                 </div>
                 <div className="category-list__attributes">
                   {category.attributes.length ? (

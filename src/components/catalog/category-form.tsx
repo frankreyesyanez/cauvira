@@ -11,11 +11,35 @@ type CategoryOption = { id: string; name: string };
 type CategoryFormProps = {
   action(formData: FormData): Promise<CatalogActionResult>;
   categories: CategoryOption[];
+  initialCategory?: {
+    id: string;
+    name: string;
+    slug: string;
+    parentId: string | null;
+    attributes: Array<{
+      id: string;
+      key: string;
+      label: string;
+      type: AttributeType;
+      required: boolean;
+      filterable: boolean;
+      comparable: boolean;
+      unit: string | null;
+      options: string[];
+    }>;
+  };
 };
 
 type AttributeRow = {
-  clientId: number;
+  clientId: number | string;
+  key?: string;
+  label?: string;
   type: AttributeType;
+  required?: boolean;
+  filterable?: boolean;
+  comparable?: boolean;
+  unit?: string | null;
+  options?: string[];
 };
 
 const attributeTypeLabels: Record<AttributeType, string> = {
@@ -28,9 +52,20 @@ const attributeTypeLabels: Record<AttributeType, string> = {
   measurement: "Medición",
 };
 
-export function CategoryForm({ action, categories }: CategoryFormProps) {
-  const [attributes, setAttributes] = useState<AttributeRow[]>([]);
-  const [nextId, setNextId] = useState(1);
+export function CategoryForm({
+  action,
+  categories,
+  initialCategory,
+}: CategoryFormProps) {
+  const [attributes, setAttributes] = useState<AttributeRow[]>(
+    initialCategory?.attributes.map((attribute) => ({
+      clientId: attribute.id,
+      ...attribute,
+    })) ?? [],
+  );
+  const [nextId, setNextId] = useState(
+    (initialCategory?.attributes.length ?? 0) + 1,
+  );
   const [result, setResult] = useState<CatalogActionResult | null>(null);
   const [isPending, startTransition] = useTransition();
   const errors = result && !result.ok ? result.fieldErrors : {};
@@ -59,7 +94,11 @@ export function CategoryForm({ action, categories }: CategoryFormProps) {
       {result?.ok ? (
         <div className="ui-alert ui-alert--opportunity" role="status">
           <span aria-hidden="true" className="ui-icon">✓</span>
-          <p>Categoría guardada. Ya puedes asignarla a productos.</p>
+          <p>
+            {initialCategory
+              ? "Categoría actualizada."
+              : "Categoría guardada. Ya puedes asignarla a productos."}
+          </p>
         </div>
       ) : null}
 
@@ -69,6 +108,7 @@ export function CategoryForm({ action, categories }: CategoryFormProps) {
           <Field
             description="Nombre visible para el equipo y clientes."
             error={errors.name?.[0]}
+            defaultValue={initialCategory?.name}
             label="Nombre"
             name="name"
             placeholder="Máquinas de hielo"
@@ -77,6 +117,7 @@ export function CategoryForm({ action, categories }: CategoryFormProps) {
           <Field
             description="URL en minúsculas, sin espacios ni acentos."
             error={errors.slug?.[0]}
+            defaultValue={initialCategory?.slug}
             label="Slug"
             name="slug"
             placeholder="maquinas-de-hielo"
@@ -94,11 +135,14 @@ export function CategoryForm({ action, categories }: CategoryFormProps) {
               className="field__control"
               id="parentId"
               name="parentId"
+              defaultValue={initialCategory?.parentId ?? ""}
             >
               <option value="">Sin categoría superior</option>
-              {categories.map((category) => (
+              {categories
+                .filter((category) => category.id !== initialCategory?.id)
+                .map((category) => (
                 <option key={category.id} value={category.id}>{category.name}</option>
-              ))}
+                ))}
             </select>
             <p className="field__description" id="parentId-description">
               Opcional para organizar subcategorías.
@@ -150,6 +194,7 @@ export function CategoryForm({ action, categories }: CategoryFormProps) {
                     <Field
                       description="Clave interna estable, por ejemplo daily_output."
                       error={errors[`${prefix}.key`]?.[0]}
+                      defaultValue={attribute.key}
                       label="Clave"
                       name={`${prefix}.key`}
                       required
@@ -157,6 +202,7 @@ export function CategoryForm({ action, categories }: CategoryFormProps) {
                     <Field
                       description="Etiqueta comprensible para quien captura."
                       error={errors[`${prefix}.label`]?.[0]}
+                      defaultValue={attribute.label}
                       label="Etiqueta"
                       name={`${prefix}.label`}
                       required
@@ -202,6 +248,7 @@ export function CategoryForm({ action, categories }: CategoryFormProps) {
                       <Field
                         description="Ej. kg/día, V o m²."
                         error={errors[`${prefix}.unit`]?.[0]}
+                        defaultValue={attribute.unit ?? ""}
                         label="Unidad"
                         name={`${prefix}.unit`}
                         required
@@ -211,6 +258,7 @@ export function CategoryForm({ action, categories }: CategoryFormProps) {
                       <Field
                         description="Separa cada opción con coma."
                         error={errors[`${prefix}.options`]?.[0]}
+                        defaultValue={attribute.options?.join(", ")}
                         label="Opciones"
                         name={`${prefix}.options`}
                         placeholder="Manual, Automática"
@@ -225,7 +273,13 @@ export function CategoryForm({ action, categories }: CategoryFormProps) {
                       ["comparable", "Comparable"],
                     ].map(([name, label]) => (
                       <label className="choice" key={name}>
-                        <input name={`${prefix}.${name}`} type="checkbox" />
+                        <input
+                          defaultChecked={Boolean(
+                            attribute[name as "required" | "filterable" | "comparable"],
+                          )}
+                          name={`${prefix}.${name}`}
+                          type="checkbox"
+                        />
                         <span>{label}</span>
                       </label>
                     ))}
@@ -239,7 +293,9 @@ export function CategoryForm({ action, categories }: CategoryFormProps) {
 
       <div className="admin-form__footer">
         <span className="admin-form__note">Los cambios se validan antes de persistir.</span>
-        <Button loading={isPending} type="submit">Guardar categoría</Button>
+        <Button loading={isPending} type="submit">
+          {initialCategory ? "Actualizar categoría" : "Guardar categoría"}
+        </Button>
       </div>
     </form>
   );
