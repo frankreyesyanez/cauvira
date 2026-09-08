@@ -365,7 +365,8 @@ export function ProductForm({
               ))}
             </select>
             <p className="field__description" id="purchaseMode-help">
-              Controla la acción comercial que verá el cliente.
+              Clasifica internamente cómo se vende el producto. El cliente
+              siempre ve Agregar al carrito.
             </p>
             <ControlError error={errors.purchaseMode} id="purchaseMode-error" />
           </div>

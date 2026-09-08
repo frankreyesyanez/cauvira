@@ -140,13 +140,17 @@ function optionGroupsFromFormData(formData: FormData) {
       if (match) valueIndexes.add(Number(match[1]));
     }
 
+    const groupId = String(formData.get(`${prefix}.id`) ?? "").trim();
     return {
+      ...(groupId ? { id: groupId } : {}),
       name: formData.get(`${prefix}.name`),
       required: formData.has(`${prefix}.required`),
       sortOrder: parseSortOrder(formData.get(`${prefix}.sortOrder`), groupIndex),
       values: [...valueIndexes].sort((a, b) => a - b).map((valueIndex) => {
         const valuePrefix = `${prefix}.values.${valueIndex}`;
+        const valueId = String(formData.get(`${valuePrefix}.id`) ?? "").trim();
         return {
+          ...(valueId ? { id: valueId } : {}),
           label: formData.get(`${valuePrefix}.label`),
           priceDeltaMinor: parsePriceMinor(formData.get(`${valuePrefix}.price`)),
           sortOrder: parseSortOrder(

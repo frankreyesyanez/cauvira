@@ -231,6 +231,56 @@ describe("catalog actions", () => {
     expect(dependencies.catalog.getCategoryWithAttributes).not.toHaveBeenCalled();
   });
 
+  it("preserves option group and value ids on product update", async () => {
+    const dependencies = createDependencies();
+    const actions = createCatalogActions(dependencies);
+    const groupId = "7c3e2a91-4b18-4d6a-9f0e-2a1b3c4d5e6f";
+    const valueId = "8d4f3b02-5c29-4e7b-a01f-3b2c4d5e6f70";
+    const formData = new FormData();
+    formData.set("title", "Máquina de hielo industrial");
+    formData.set("slug", "maquina-de-hielo-industrial");
+    formData.set("categoryId", categoryId);
+    formData.set("purchaseMode", "starting_price");
+    formData.set("price", "125000.50");
+    formData.set("summary", "Equipo industrial listo para cotizar.");
+    formData.set("description", "Descripción detallada.");
+    formData.set("attribute.daily_output", "500");
+    formData.set("optionGroups.0.id", groupId);
+    formData.set("optionGroups.0.name", "Talla");
+    formData.set("optionGroups.0.required", "on");
+    formData.set("optionGroups.0.values.0.id", valueId);
+    formData.set("optionGroups.0.values.0.label", "M");
+    formData.set("optionGroups.0.values.0.price", "0");
+
+    await expect(actions.updateProductAction("product-id", formData)).resolves.toEqual({
+      ok: true,
+      id: "product-id",
+    });
+    expect(dependencies.catalog.updateProduct).toHaveBeenCalledWith(
+      "product-id",
+      expect.objectContaining({
+        product: expect.objectContaining({
+          optionGroups: [
+            {
+              id: groupId,
+              name: "Talla",
+              required: true,
+              sortOrder: 0,
+              values: [
+                {
+                  id: valueId,
+                  label: "M",
+                  priceDeltaMinor: 0,
+                  sortOrder: 0,
+                },
+              ],
+            },
+          ],
+        }),
+      }),
+    );
+  });
+
   it("authorizes category and product edits before persistence", async () => {
     const dependencies = createDependencies();
     const actions = createCatalogActions(dependencies);

@@ -7,12 +7,14 @@ import type { CatalogOptionGroup } from "@/features/catalog/pricing";
 
 type OptionValueDraft = {
   clientId: string;
+  id?: string;
   label: string;
   pricePesos: number;
 };
 
 type OptionGroupDraft = {
   clientId: string;
+  id?: string;
   name: string;
   required: boolean;
   values: OptionValueDraft[];
@@ -26,10 +28,12 @@ type ProductOptionsFieldsProps = {
 function toDrafts(groups: CatalogOptionGroup[]): OptionGroupDraft[] {
   return groups.map((group) => ({
     clientId: group.id,
+    id: group.id,
     name: group.name,
     required: group.required,
     values: group.values.map((value) => ({
       clientId: value.id,
+      id: value.id,
       label: value.label,
       pricePesos: value.priceDeltaMinor / 100,
     })),
@@ -134,6 +138,9 @@ export function ProductOptionsFields({
                     Quitar grupo
                   </button>
                 </div>
+                {group.id ? (
+                  <input name={`${prefix}.id`} type="hidden" value={group.id} />
+                ) : null}
                 <input name={`${prefix}.sortOrder`} type="hidden" value={groupIndex} />
                 <div className="admin-form__grid">
                   <Field
@@ -171,6 +178,13 @@ export function ProductOptionsFields({
                             Quitar valor
                           </button>
                         </div>
+                        {value.id ? (
+                          <input
+                            name={`${valuePrefix}.id`}
+                            type="hidden"
+                            value={value.id}
+                          />
+                        ) : null}
                         <input
                           name={`${valuePrefix}.sortOrder`}
                           type="hidden"

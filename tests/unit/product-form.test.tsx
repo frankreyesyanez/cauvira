@@ -126,6 +126,53 @@ it("prefills editable product values and inherited attributes", () => {
   expect(screen.getByLabelText(/publicar al guardar/i)).toBeChecked();
 });
 
+it("submits existing option group and value ids as hidden fields", () => {
+  const groupId = "7c3e2a91-4b18-4d6a-9f0e-2a1b3c4d5e6f";
+  const valueId = "8d4f3b02-5c29-4e7b-a01f-3b2c4d5e6f70";
+
+  render(
+    <ProductForm
+      action={vi.fn()}
+      categories={categories}
+      initialProduct={{
+        title: "Máquina existente",
+        slug: "maquina-existente",
+        categoryId: categories[0].id,
+        purchaseMode: "starting_price",
+        priceMinor: 12500050,
+        summary: "Resumen existente del producto.",
+        description: "Descripción existente.",
+        published: true,
+        attributes: {
+          daily_output: { value: 500, unit: "kg/día" },
+        },
+        optionGroups: [
+          {
+            id: groupId,
+            name: "Talla",
+            required: true,
+            sortOrder: 0,
+            values: [
+              {
+                id: valueId,
+                label: "M",
+                priceDeltaMinor: 0,
+                sortOrder: 0,
+              },
+            ],
+          },
+        ],
+      }}
+    />,
+  );
+
+  const form = screen.getByRole("button", { name: /actualizar producto/i }).closest("form");
+  expect(form).not.toBeNull();
+  const formData = new FormData(form!);
+  expect(formData.get("optionGroups.0.id")).toBe(groupId);
+  expect(formData.get("optionGroups.0.values.0.id")).toBe(valueId);
+});
+
 it("links description and purchase-mode server errors accessibly", async () => {
   const action = vi.fn().mockResolvedValue({
     ok: false,
@@ -147,6 +194,6 @@ it("links description and purchase-mode server errors accessibly", async () => {
     /explica beneficios.*la descripción no es válida/i,
   );
   expect(screen.getByLabelText(/modalidad de compra/i)).toHaveAccessibleDescription(
-    /controla la acción.*selecciona una modalidad válida/i,
+    /clasifica internamente.*selecciona una modalidad válida/i,
   );
 });
