@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -13,8 +13,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  applicationName: "Cauvira",
   title: "Cauvira",
   description: "Comercio industrial en México. Equipa lo que sigue.",
+};
+
+export const viewport: Viewport = {
+  colorScheme: "dark",
+  themeColor: "#21151f",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
