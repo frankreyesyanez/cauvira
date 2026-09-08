@@ -671,6 +671,10 @@ describe("DrizzleCatalogRepository", () => {
     });
     createdProductIds.push(published.id);
 
+    await expect(
+      repository.listPublishedProducts({ query: "cafe" }),
+    ).resolves.toContainEqual(expect.objectContaining({ id: published.id }));
+
     const bySlug = await repository.getPublishedProductBySlug(published.slug);
     const byId = await repository.getPublishedProductById(published.id);
 

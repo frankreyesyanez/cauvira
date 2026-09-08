@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import type { createDatabase } from "@/db/create-database";
 import {
   categories,
@@ -171,6 +171,17 @@ function resolveFromMaps(
     }
   }
   return [...effective.values()];
+}
+
+const FOLD_FROM = "áàäâãéèëêíìïîóòöôõúùüûñçÁÀÄÂÃÉÈËÊÍÌÏÎÓÒÖÔÕÚÙÜÛÑÇ";
+const FOLD_TO = "aaaaaeeeeiiiiooooouuuuncAAAAAEEEEIIIIOOOOOUUUUNC";
+
+function foldedSearchPattern(query: string) {
+  return `%${query.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase()}%`;
+}
+
+function foldedIlike(column: SQLWrapper, query: string): SQL {
+  return sql`translate(lower(${column}), ${FOLD_FROM}, ${FOLD_TO}) like ${foldedSearchPattern(query)}`;
 }
 
 export function resolveCategoryAttributes(
@@ -878,8 +889,8 @@ export class DrizzleCatalogRepository implements CatalogRepository {
     if (input.query) {
       conditions.push(
         or(
-          ilike(products.title, `%${input.query}%`),
-          ilike(products.summary, `%${input.query}%`),
+          foldedIlike(products.title, input.query),
+          foldedIlike(products.summary, input.query),
         )!,
       );
     }

@@ -48,6 +48,7 @@ test("catalog manager publishes a product that appears in public search", async 
   );
   await page.getByLabel("Categoría").selectOption({ label: categoryName });
   await page.getByLabel("Modalidad de compra").selectOption("quotation");
+  await page.getByLabel("Precio público (MXN)").fill("28990");
   await page.getByRole("button", { name: "Guardar producto" }).click();
   await expect(page.getByRole("status")).toContainText(/producto guardado/i);
 
