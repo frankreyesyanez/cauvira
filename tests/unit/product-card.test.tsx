@@ -18,7 +18,7 @@ const products = [
     slug: "cancha-padel",
     summary: "Proyecto instalado.",
     purchaseMode: "quotation",
-    priceMinor: null,
+    priceMinor: 4_890_000,
   },
   {
     id: "starting",
@@ -34,7 +34,7 @@ const products = [
     slug: "casa-modular",
     summary: "Configuración a la medida.",
     purchaseMode: "assisted_contact",
-    priceMinor: null,
+    priceMinor: 4_890_000,
   },
 ] satisfies Array<{
   id: string;
@@ -42,7 +42,7 @@ const products = [
   slug: string;
   summary: string;
   purchaseMode: PurchaseMode;
-  priceMinor: number | null;
+  priceMinor: number;
 }>;
 
 it("maps every purchase mode to its accurate public action", () => {

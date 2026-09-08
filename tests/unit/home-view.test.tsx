@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { expect, it } from "vitest";
-import type { PurchaseMode } from "@/features/catalog/catalog.contracts";
 import { HomeView } from "@/components/catalog/home-view";
+import type { PublishedProductSummary } from "@/features/catalog/catalog.repository";
 
 const publishedProducts = [
   {
@@ -11,6 +11,8 @@ const publishedProducts = [
     summary: "Agua lista para servir.",
     purchaseMode: "direct_purchase",
     priceMinor: 489_000,
+    hasOptions: false,
+    images: [],
   },
   {
     id: "quote",
@@ -18,7 +20,9 @@ const publishedProducts = [
     slug: "cancha-padel",
     summary: "Proyecto instalado.",
     purchaseMode: "quotation",
-    priceMinor: null,
+    priceMinor: 4_890_000,
+    hasOptions: false,
+    images: [],
   },
   {
     id: "starting",
@@ -27,6 +31,8 @@ const publishedProducts = [
     summary: "Producción comercial.",
     purchaseMode: "starting_price",
     priceMinor: 4_890_000,
+    hasOptions: false,
+    images: [],
   },
   {
     id: "assisted",
@@ -34,16 +40,11 @@ const publishedProducts = [
     slug: "casa-modular",
     summary: "Configuración a la medida.",
     purchaseMode: "assisted_contact",
-    priceMinor: null,
+    priceMinor: 4_890_000,
+    hasOptions: false,
+    images: [],
   },
-] satisfies Array<{
-  id: string;
-  title: string;
-  slug: string;
-  summary: string;
-  purchaseMode: PurchaseMode;
-  priceMinor: number | null;
-}>;
+] satisfies PublishedProductSummary[];
 
 it("identifies Cauvira as a commerce experience", () => {
   render(<HomeView products={[]} categories={[]} />);

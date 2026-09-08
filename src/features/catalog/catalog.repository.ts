@@ -1,13 +1,17 @@
-import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import type { createDatabase } from "@/db/create-database";
 import {
   categories,
   categoryAttributes,
   productAttributeValues,
+  productImages,
+  productOptionGroups,
+  productOptionValues,
   products,
 } from "@/db/schema/catalog";
 import type { AttributeType, PurchaseMode } from "./catalog.contracts";
 import type { CreateCategoryInput, CreateProductInput } from "./catalog.validation";
+import type { CatalogOptionGroup } from "./pricing";
 
 export type CategoryAttributeRecord = {
   id: string;
@@ -42,10 +46,14 @@ export type AdminProductSummary = {
   updatedAt: Date;
 };
 
+export type ProductImageRecord = { id: string; url: string; sortOrder: number };
+
 export type AdminProductDetail = AdminProductSummary & {
   summary: string;
   description: string;
   attributes: Record<string, ProductAttributeValue>;
+  optionGroups: CatalogOptionGroup[];
+  images: ProductImageRecord[];
 };
 
 export type ProductAttributeValue =
@@ -62,6 +70,8 @@ export type PublishedProductSummary = {
   summary: string;
   purchaseMode: string;
   priceMinor: number;
+  hasOptions: boolean;
+  images: ProductImageRecord[];
 };
 
 export type PublishedProductDetail = PublishedProductSummary & {
@@ -71,6 +81,7 @@ export type PublishedProductDetail = PublishedProductSummary & {
     value: unknown;
     unit: string | null;
   }>;
+  optionGroups: CatalogOptionGroup[];
 };
 
 export interface CatalogRepository {
@@ -167,6 +178,164 @@ export function resolveCategoryAttributes(
 ) {
   const maps = buildCategoryMaps(categoryRows, attributeRows);
   return resolveFromMaps(categoryId, maps.categoriesById, maps.attributesByCategory);
+}
+
+type CatalogWriter = Pick<Database, "insert" | "delete">;
+type CatalogReader = Pick<Database, "select">;
+
+async function replaceProductOptionGroups(
+  writer: CatalogWriter,
+  productId: string,
+  groups: CreateProductInput["optionGroups"],
+) {
+  await writer
+    .delete(productOptionGroups)
+    .where(eq(productOptionGroups.productId, productId));
+
+  for (const group of groups) {
+    const [insertedGroup] = await writer
+      .insert(productOptionGroups)
+      .values({
+        ...(group.id ? { id: group.id } : {}),
+        productId,
+        name: group.name,
+        required: group.required,
+        sortOrder: group.sortOrder,
+      })
+      .returning({ id: productOptionGroups.id });
+
+    if (!insertedGroup) {
+      throw new Error("Failed to create product option group");
+    }
+
+    await writer.insert(productOptionValues).values(
+      group.values.map((value) => ({
+        ...(value.id ? { id: value.id } : {}),
+        groupId: insertedGroup.id,
+        label: value.label,
+        priceDeltaMinor: value.priceDeltaMinor,
+        sortOrder: value.sortOrder,
+      })),
+    );
+  }
+}
+
+async function loadOptionGroups(
+  reader: CatalogReader,
+  productId: string,
+): Promise<CatalogOptionGroup[]> {
+  const groups = await reader
+    .select({
+      id: productOptionGroups.id,
+      name: productOptionGroups.name,
+      required: productOptionGroups.required,
+      sortOrder: productOptionGroups.sortOrder,
+    })
+    .from(productOptionGroups)
+    .where(eq(productOptionGroups.productId, productId))
+    .orderBy(asc(productOptionGroups.sortOrder), asc(productOptionGroups.id));
+
+  if (groups.length === 0) {
+    return [];
+  }
+
+  const values = await reader
+    .select({
+      id: productOptionValues.id,
+      groupId: productOptionValues.groupId,
+      label: productOptionValues.label,
+      priceDeltaMinor: productOptionValues.priceDeltaMinor,
+      sortOrder: productOptionValues.sortOrder,
+    })
+    .from(productOptionValues)
+    .where(
+      inArray(
+        productOptionValues.groupId,
+        groups.map((group) => group.id),
+      ),
+    )
+    .orderBy(asc(productOptionValues.sortOrder), asc(productOptionValues.id));
+
+  const valuesByGroup = new Map<string, CatalogOptionGroup["values"]>();
+  for (const value of values) {
+    const current = valuesByGroup.get(value.groupId) ?? [];
+    current.push({
+      id: value.id,
+      label: value.label,
+      priceDeltaMinor: value.priceDeltaMinor,
+      sortOrder: value.sortOrder,
+    });
+    valuesByGroup.set(value.groupId, current);
+  }
+
+  return groups.map((group) => ({
+    ...group,
+    values: valuesByGroup.get(group.id) ?? [],
+  }));
+}
+
+async function loadProductImages(
+  reader: CatalogReader,
+  productId: string,
+): Promise<ProductImageRecord[]> {
+  return reader
+    .select({
+      id: productImages.id,
+      url: productImages.url,
+      sortOrder: productImages.sortOrder,
+    })
+    .from(productImages)
+    .where(eq(productImages.productId, productId))
+    .orderBy(asc(productImages.sortOrder), asc(productImages.id));
+}
+
+async function loadImagesByProductIds(
+  reader: CatalogReader,
+  productIds: string[],
+): Promise<Map<string, ProductImageRecord[]>> {
+  const imagesByProduct = new Map<string, ProductImageRecord[]>();
+  for (const id of productIds) {
+    imagesByProduct.set(id, []);
+  }
+  if (productIds.length === 0) {
+    return imagesByProduct;
+  }
+
+  const rows = await reader
+    .select({
+      id: productImages.id,
+      productId: productImages.productId,
+      url: productImages.url,
+      sortOrder: productImages.sortOrder,
+    })
+    .from(productImages)
+    .where(inArray(productImages.productId, productIds))
+    .orderBy(asc(productImages.sortOrder), asc(productImages.id));
+
+  for (const row of rows) {
+    imagesByProduct.get(row.productId)?.push({
+      id: row.id,
+      url: row.url,
+      sortOrder: row.sortOrder,
+    });
+  }
+  return imagesByProduct;
+}
+
+async function loadProductIdsWithOptions(
+  reader: CatalogReader,
+  productIds: string[],
+): Promise<Set<string>> {
+  if (productIds.length === 0) {
+    return new Set();
+  }
+
+  const rows = await reader
+    .select({ productId: productOptionGroups.productId })
+    .from(productOptionGroups)
+    .where(inArray(productOptionGroups.productId, productIds));
+
+  return new Set(rows.map((row) => row.productId));
 }
 
 export class DrizzleCatalogRepository implements CatalogRepository {
@@ -517,6 +686,8 @@ export class DrizzleCatalogRepository implements CatalogRepository {
     return {
       ...product,
       attributes: Object.fromEntries(values.map(({ key, value }) => [key, value])),
+      optionGroups: await loadOptionGroups(this.database, id),
+      images: await loadProductImages(this.database, id),
     };
   }
 
@@ -525,9 +696,10 @@ export class DrizzleCatalogRepository implements CatalogRepository {
     attributes: Record<string, ProductAttributeValue>;
   }) {
     return this.database.transaction(async (transaction) => {
+      const { optionGroups, ...productValues } = input.product;
       const [product] = await transaction
         .insert(products)
-        .values(input.product)
+        .values(productValues)
         .returning({ id: products.id, slug: products.slug });
 
       if (!product) {
@@ -578,6 +750,7 @@ export class DrizzleCatalogRepository implements CatalogRepository {
         );
       }
 
+      await replaceProductOptionGroups(transaction, product.id, optionGroups);
       return product;
     });
   }
@@ -590,9 +763,10 @@ export class DrizzleCatalogRepository implements CatalogRepository {
     },
   ) {
     return this.database.transaction(async (transaction) => {
+      const { optionGroups, ...productValues } = input.product;
       const [product] = await transaction
         .update(products)
-        .set({ ...input.product, updatedAt: new Date() })
+        .set({ ...productValues, updatedAt: new Date() })
         .where(eq(products.id, id))
         .returning({ id: products.id, slug: products.slug });
       if (!product) throw new Error("Product not found");
@@ -639,6 +813,7 @@ export class DrizzleCatalogRepository implements CatalogRepository {
         );
       }
 
+      await replaceProductOptionGroups(transaction, id, optionGroups);
       return product;
     });
   }
@@ -661,7 +836,7 @@ export class DrizzleCatalogRepository implements CatalogRepository {
       conditions.push(eq(categories.slug, input.categorySlug));
     }
 
-    return this.database
+    const rows = await this.database
       .select({
         id: products.id,
         title: products.title,
@@ -673,6 +848,18 @@ export class DrizzleCatalogRepository implements CatalogRepository {
       .from(products)
       .innerJoin(categories, eq(products.categoryId, categories.id))
       .where(and(...conditions));
+
+    const productIds = rows.map((row) => row.id);
+    const [imagesByProduct, productIdsWithOptions] = await Promise.all([
+      loadImagesByProductIds(this.database, productIds),
+      loadProductIdsWithOptions(this.database, productIds),
+    ]);
+
+    return rows.map((row) => ({
+      ...row,
+      hasOptions: productIdsWithOptions.has(row.id),
+      images: imagesByProduct.get(row.id) ?? [],
+    }));
   }
 
   async getPublishedProductBySlug(
@@ -709,6 +896,17 @@ export class DrizzleCatalogRepository implements CatalogRepository {
       )
       .where(eq(productAttributeValues.productId, product.id));
 
-    return { ...product, attributes };
+    const [optionGroups, images] = await Promise.all([
+      loadOptionGroups(this.database, product.id),
+      loadProductImages(this.database, product.id),
+    ]);
+
+    return {
+      ...product,
+      attributes,
+      optionGroups,
+      images,
+      hasOptions: optionGroups.length > 0,
+    };
   }
 }

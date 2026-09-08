@@ -185,6 +185,7 @@ const seedProducts: SeedProduct[] = [
       description:
         "Equipo para operación diaria en cocinas centrales y hoteles. El precio publicado es un punto de partida; la instalación, el voltaje y el tratamiento de agua se confirman en sitio.",
       published: true,
+      optionGroups: [],
     },
     attributes: {
       daily_output: { value: 500, unit: "kg/día" },
@@ -204,6 +205,7 @@ const seedProducts: SeedProduct[] = [
       description:
         "Diseñada para turnos largos y recarga continua. Incluye ficha técnica de consumo eléctrico y recomendaciones de ventilación para cuartos de máquina.",
       published: true,
+      optionGroups: [],
     },
     attributes: {
       daily_output: { value: 1000, unit: "kg/día" },
@@ -217,12 +219,13 @@ const seedProducts: SeedProduct[] = [
       title: "Montacargas eléctrico",
       slug: "montacargas-electrico",
       purchaseMode: "quotation",
-      priceMinor: null,
+      priceMinor: 285_000_00,
       summary:
         "Montacargas eléctrico de pasillo para carga en almacén, planta y centros de distribución.",
       description:
         "La cotización considera capacidad, altura de elevación, batería y condiciones del piso. Ideal para interiores donde se requiere operación silenciosa y sin emisiones.",
       published: true,
+      optionGroups: [],
     },
     attributes: {
       load_capacity: { value: 2.5, unit: "t" },
@@ -236,12 +239,13 @@ const seedProducts: SeedProduct[] = [
       title: "Apilador diésel 3 toneladas",
       slug: "montacargas-diesel-3t",
       purchaseMode: "quotation",
-      priceMinor: null,
+      priceMinor: 320_000_00,
       summary:
         "Apilador diésel para patios, descargas y movimiento de tarimas a la intemperie.",
       description:
         "Proyecto cotizado según horas de uso, implementos y servicio local. Recomendado para operación mixta en andén y yardas con piso irregular.",
       published: true,
+      optionGroups: [],
     },
     attributes: {
       load_capacity: { value: 3, unit: "t" },
@@ -261,6 +265,7 @@ const seedProducts: SeedProduct[] = [
       description:
         "Lote trazable para cafeterías y oficinas. Empaque de 1 kg con fecha de tueste visible y perfil sensorial para espresso o filtrado.",
       published: true,
+      optionGroups: [],
     },
     attributes: {
       origin: "Chiapas, México",
@@ -280,6 +285,7 @@ const seedProducts: SeedProduct[] = [
       description:
         "Mezcla de tueste oscuro para máquinas de cápsula estándar. Caja de 50 piezas con barrera de aroma y ficha de intensidad.",
       published: true,
+      optionGroups: [],
     },
     attributes: {
       origin: "Veracruz, México",
@@ -293,12 +299,13 @@ const seedProducts: SeedProduct[] = [
       title: "Cancha de pádel panorámica",
       slug: "cancha-de-padel-panoramica",
       purchaseMode: "assisted_contact",
-      priceMinor: null,
+      priceMinor: 1_250_000_00,
       summary:
         "Cancha panorámica con césped sintético; un especialista confirma estructura, iluminación y obra civil.",
       description:
         "Proyecto asistido para clubes y desarrollos. La visita técnica cubre cimentación, drenaje, cristal y tiempos de instalación.",
       published: true,
+      optionGroups: [],
     },
     attributes: {
       surface: "Césped sintético",
@@ -312,12 +319,13 @@ const seedProducts: SeedProduct[] = [
       title: "Cancha de pádel indoor",
       slug: "cancha-de-padel-indoor",
       purchaseMode: "assisted_contact",
-      priceMinor: null,
+      priceMinor: 980_000_00,
       summary:
         "Cancha indoor de resina para naves existentes; el alcance se define con un especialista de Cauvira.",
       description:
         "Pensada para reconversión de espacios cubiertos. Se coordina altura libre, iluminación LED y cerramiento estándar o panorámico.",
       published: true,
+      optionGroups: [],
     },
     attributes: {
       surface: "Resina",
